@@ -499,6 +499,7 @@ function clearResult() {
 // ====== SCANNER — getUserMedia أولاً + html5-qrcode stream ======
 // ══════════════════════════════════════════════
 //  ماسح الباركود — Html5QrcodeScanner (mebjas/html5-qrcode)
+//  الكود الرسمي من المكتبة بدون تعديل جوهري
 // ══════════════════════════════════════════════
 let h5scanner = null;
 let scanning  = false;
@@ -515,79 +516,70 @@ function startScanner() {
   const btn       = document.getElementById('scanner-toggle-btn');
   const container = document.getElementById('scanner-container');
 
-  try {
-    container.style.display = 'block';
-    document.getElementById('scanner-video').style.display = 'none';
-    document.getElementById('capture-btn').style.display   = 'none';
-
-    if (h5scanner) { try { h5scanner.clear(); } catch(e) {} h5scanner = null; }
-    document.getElementById('qr-reader').innerHTML = '';
-
-    h5scanner = new Html5QrcodeScanner(
-      'qr-reader',
-      {
-        fps: 15,
-        qrbox: { width: 260, height: 150 },
-        aspectRatio: 1.6,
-        rememberLastUsedCamera: true,
-        showTorchButtonIfSupported: true,
-        showZoomSliderIfSupported: false,
-        useBarCodeDetectorIfSupported: true,
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.ITF,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.QR_CODE,
-          Html5QrcodeSupportedFormats.DATA_MATRIX
-        ],
-        videoConstraints: {
-          facingMode: 'environment',
-          width:  { ideal: 1280 },
-          height: { ideal: 720  }
-        },
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-      },
-      (decodedText) => { onBarcodeFound(decodedText); stopScanner(); },
-      () => {}
-    );
-
-    h5scanner.render('qr-reader');
-    setTimeout(cleanH5UI, 700);
-
-    scanning = true;
-    btn.innerHTML = '⏹️ إيقاف السكانر';
-    btn.style.background = 'var(--red)';
-    btn.disabled = false;
-
-  } catch(err) {
-    scanning = false;
-    container.style.display = 'none';
-    btn.innerHTML = '📷 تشغيل السكانر';
-    btn.style.background = '';
-    btn.disabled = false;
-    const msg = String(err).toLowerCase();
-    let text = '❌ تعذّر تشغيل الكاميرا.';
-    if (msg.includes('permission') || msg.includes('denied') || msg.includes('notallowed'))
-      text = '❌ تم رفض إذن الكاميرا. افتح إعدادات الجهاز وامنح الإذن.';
-    document.getElementById('result-area').innerHTML = `<div class="error-card">${text}</div>`;
+  // تنظيف أي instance سابق
+  if (h5scanner) {
+    try { h5scanner.clear(); } catch(e) {}
+    h5scanner = null;
   }
-}
+  document.getElementById('qr-reader').innerHTML = '';
+  document.getElementById('scanner-video').style.display = 'none';
+  document.getElementById('capture-btn').style.display   = 'none';
+  container.style.display = 'block';
 
-function cleanH5UI() {
-  ['#qr-reader__header_message','#qr-reader__status_span',
-   '#qr-reader__dashboard_section_swaplink','#qr-reader__filescan_input',
-   '#qr-reader__dashboard','#qr-reader img'
-  ].forEach(sel => document.querySelectorAll(sel).forEach(el => { el.style.display='none'; }));
-  const r = document.getElementById('qr-reader');
-  if (r) { r.style.border='none'; r.style.padding='0'; }
+  // ── الكود الرسمي من mebjas/html5-qrcode ──
+  function onScanSuccess(decodedText, decodedResult) {
+    onBarcodeFound(decodedText);
+    stopScanner();
+  }
+
+  function onScanError(errorMessage) {
+    // تجاهل أخطاء عدم القراءة — طبيعية أثناء المسح
+  }
+
+  const config = {
+    fps: 15,
+    qrbox: { width: 280, height: 160 },
+    rememberLastUsedCamera: true,
+    supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA], // كاميرا فقط
+    showTorchButtonIfSupported: true,
+    showZoomSliderIfSupported: true,
+    defaultZoomValueIfSupported: 1,
+    useBarCodeDetectorIfSupported: true,
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.QR_CODE,
+      Html5QrcodeSupportedFormats.DATA_MATRIX
+    ]
+  };
+
+  h5scanner = new Html5QrcodeScanner('qr-reader', config, /* verbose= */ false);
+  h5scanner.render(onScanSuccess, onScanError);
+
+  // إخفاء UI الافتراضي غير المرغوب بعد الرندر
+  setTimeout(() => {
+    document.querySelectorAll(
+      '#qr-reader__header_message, #qr-reader__filescan_input, #qr-reader__dashboard_section_swaplink'
+    ).forEach(el => { if (el) el.style.display = 'none'; });
+    const reader = document.getElementById('qr-reader');
+    if (reader) { reader.style.border = 'none'; }
+  }, 800);
+
+  scanning = true;
+  btn.innerHTML = '⏹️ إيقاف السكانر';
+  btn.style.background = 'var(--red)';
+  btn.disabled = false;
 }
 
 function stopScanner() {
-  try { if (h5scanner) { h5scanner.clear().catch(()=>{}); h5scanner = null; } } catch(e) {}
+  try {
+    if (h5scanner) { h5scanner.clear(); h5scanner = null; }
+  } catch(e) {}
   scanning = false;
   document.getElementById('scanner-video').style.display    = '';
   document.getElementById('scanner-container').style.display = 'none';
