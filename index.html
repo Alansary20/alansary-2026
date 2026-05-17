@@ -577,137 +577,72 @@ async function startScanner() {
   document.getElementById('capture-btn').style.display = 'block';
   video.addEventListener('click', refocusCamera, { passive: true });
 
-  // ── الخطوة 3: BarcodeDetector أولاً (أصلي وأسرع) ثم html5-qrcode ──
-  if ('BarcodeDetector' in window) {
-    startBarcodeDetectorScan(video);
-  } else if (typeof Html5Qrcode !== 'undefined') {
-    startH5QrFromStream();
-  } else {
-    startManualScan(video);
-  }
+    // ── الخطوة 3: تشغيل المحرك ──
+  startScanEngine(video);
 }
 
-// ─── المحرك الرئيسي: BarcodeDetector مباشرة على الفيديو — بدون Canvas ───
-function startBarcodeDetectorScan(video) {
-  const detector = new BarcodeDetector({
-    formats: ['ean_13','ean_8','code_128','upc_a','upc_e','itf','code_39','qr_code','data_matrix']
-  });
+// ══════════════════════════════════════════════
+//  محرك المسح الموحّد — سريع، دقيق، بدون تعقيد
+// ══════════════════════════════════════════════
+function startScanEngine(video) {
+  // إعداد BarcodeDetector — الأسرع والأدق على Android/Chrome
+  const FORMATS = ['ean_13','ean_8','code_128','upc_a','upc_e','itf','code_39','qr_code','data_matrix'];
+  const detector = ('BarcodeDetector' in window) ? new BarcodeDetector({ formats: FORMATS }) : null;
+
+  // Canvas للـ fallback
+  scanCanvas = document.createElement('canvas');
+  scanCtx    = scanCanvas.getContext('2d', { willReadFrequently: true });
 
   let lastCode = '', streak = 0, busy = false;
+  let useVideo = true; // نجرب الفيديو مباشرة أولاً، ثم Canvas إن فشل
 
   scanTimer = setInterval(async () => {
     if (!scanning || busy || video.readyState < 2) return;
     busy = true;
     try {
-      // تحليل الفيديو مباشرة — أعلى جودة بدون أي تحويل أو ضغط
-      const results = await detector.detect(video);
+      let results = [];
+
+      if (detector) {
+        if (useVideo) {
+          try {
+            results = await detector.detect(video); // الأسرع — بدون canvas
+          } catch(e) {
+            useVideo = false; // هذا الجهاز لا يدعم detect(video) — نتحول للـ Canvas
+          }
+        }
+        if (!useVideo) {
+          scanCanvas.width  = video.videoWidth  || 640;
+          scanCanvas.height = video.videoHeight || 480;
+          scanCtx.drawImage(video, 0, 0);
+          results = await detector.detect(scanCanvas);
+        }
+      } else if (typeof Html5Qrcode !== 'undefined') {
+        // fallback نهائي: html5-qrcode
+        scanCanvas.width  = video.videoWidth  || 640;
+        scanCanvas.height = video.videoHeight || 480;
+        scanCtx.drawImage(video, 0, 0);
+        const blob = await new Promise(r => scanCanvas.toBlob(r, 'image/jpeg', 0.92));
+        if (blob) {
+          const code = await Html5Qrcode.scanFile(new File([blob],'f.jpg',{type:'image/jpeg'}), false).catch(()=>null);
+          if (code) results = [{ rawValue: code }];
+        }
+      }
+
       if (results.length > 0) {
         const code = results[0].rawValue;
         if (code === lastCode) { streak++; } else { lastCode = code; streak = 1; }
         if (streak >= 2) {
           clearInterval(scanTimer); scanTimer = null;
           onBarcodeFound(code);
-          setTimeout(() => { if (scanning) stopScanner(); }, 500);
-        }
-      } else { lastCode = ''; streak = 0; }
-    } catch(e) {
-      // بعض الأجهزة لا تقبل الفيديو مباشرة — نرجع للـ Canvas
-      try {
-        if (!scanCanvas) {
-          scanCanvas = document.createElement('canvas');
-          scanCtx    = scanCanvas.getContext('2d', { willReadFrequently: true });
-        }
-        scanCanvas.width  = video.videoWidth  || 640;
-        scanCanvas.height = video.videoHeight || 480;
-        scanCtx.drawImage(video, 0, 0);
-        const res2 = await detector.detect(scanCanvas);
-        if (res2.length > 0) {
-          const code = res2[0].rawValue;
-          if (code === lastCode) { streak++; } else { lastCode = code; streak = 1; }
-          if (streak >= 2) {
-            clearInterval(scanTimer); scanTimer = null;
-            onBarcodeFound(code);
-            setTimeout(() => { if (scanning) stopScanner(); }, 500);
-          }
-        } else { lastCode = ''; streak = 0; }
-      } catch(e2) {}
-    }
-    busy = false;
-  }, 150);
-}
-
-// ─── المحرك الاحتياطي: html5-qrcode عبر scanFile ───
-function startH5QrFromStream() {
-  const video = document.getElementById('scanner-video');
-  scanCanvas = document.createElement('canvas');
-  scanCtx    = scanCanvas.getContext('2d', { willReadFrequently: true });
-  h5qr = new Html5Qrcode('qr-reader', { verbose: false });
-
-  let lastCode = '', streak = 0, busy = false;
-
-  scanTimer = setInterval(async () => {
-    if (!scanning || busy || video.readyState < 2) return;
-    busy = true;
-    try {
-      const w = video.videoWidth  || 640;
-      const h = video.videoHeight || 480;
-      scanCanvas.width  = w;
-      scanCanvas.height = h;
-      scanCtx.drawImage(video, 0, 0, w, h);
-      const blob = await new Promise(res => scanCanvas.toBlob(res, 'image/jpeg', 0.92));
-      if (!blob) { busy = false; return; }
-      const file = new File([blob], 'f.jpg', { type: 'image/jpeg' });
-      const code = await Html5Qrcode.scanFile(file, false).catch(() => null);
-      if (code) {
-        if (code === lastCode) { streak++; } else { lastCode = code; streak = 1; }
-        if (streak >= 2) {
-          clearInterval(scanTimer); scanTimer = null;
-          onBarcodeFound(code);
-          setTimeout(() => { if (scanning) stopScanner(); }, 600);
+          setTimeout(() => { if (scanning) stopScanner(); }, 400);
         }
       } else { lastCode = ''; streak = 0; }
     } catch(e) {}
     busy = false;
-  }, 300);
+  }, 120); // كل 120ms = ~8 إطار/ثانية
 }
 
-// ─── Fallback: BarcodeDetector أو Canvas بدون مكتبة ───
-function startManualScan(video) {
-  scanCanvas = document.createElement('canvas');
-  scanCtx    = scanCanvas.getContext('2d', { willReadFrequently: true });
-  const useDetector = 'BarcodeDetector' in window;
-  const detector    = useDetector
-    ? new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','upc_a','upc_e','itf','code_39','qr_code'] })
-    : null;
-
-  let lastCode = '', streak = 0, busy = false;
-
-  scanTimer = setInterval(async () => {
-    if (!scanning || busy || video.readyState < 2) return;
-    busy = true;
-    try {
-      scanCanvas.width  = video.videoWidth  || 640;
-      scanCanvas.height = video.videoHeight || 480;
-      scanCtx.drawImage(video, 0, 0);
-
-      if (detector) {
-        const res = await detector.detect(scanCanvas);
-        if (res.length) {
-          const code = res[0].rawValue;
-          if (code === lastCode) streak++; else { lastCode = code; streak = 1; }
-          if (streak >= 2) {
-            clearInterval(scanTimer); scanTimer = null;
-            onBarcodeFound(code);
-            setTimeout(() => { if (scanning) stopScanner(); }, 600);
-          }
-        } else { lastCode = ''; streak = 0; }
-      }
-    } catch(e) {}
-    busy = false;
-  }, 250);
-}
-
-// ── التقاط صورة وتحليلها ──
+// ── التقاط صورة يدوياً بأعلى جودة ──
 async function captureAndScan() {
   if (!scanStream) return;
   const capBtn = document.getElementById('capture-btn');
@@ -716,77 +651,55 @@ async function captureAndScan() {
 
   const video = document.getElementById('scanner-video');
   try {
-    // محاولة ImageCapture أولاً — تعطي أعلى جودة من كاميرا الجهاز
     let blob = null;
     const track = scanStream.getVideoTracks()[0];
 
+    // ImageCapture: أعلى جودة — مثل تطبيق الكاميرا
     if (typeof ImageCapture !== 'undefined') {
-      try {
-        const ic = new ImageCapture(track);
-        blob = await ic.takePhoto();
-      } catch(e) {}
+      try { blob = await new ImageCapture(track).takePhoto(); } catch(e) {}
     }
-
-    // fallback: رسم إطار الفيديو على canvas
+    // fallback: canvas
     if (!blob) {
-      const cv  = document.createElement('canvas');
+      const cv = document.createElement('canvas');
       cv.width  = video.videoWidth  || 1280;
       cv.height = video.videoHeight || 720;
       cv.getContext('2d').drawImage(video, 0, 0);
-      blob = await new Promise(res => cv.toBlob(res, 'image/jpeg', 1.0));
+      blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 1.0));
     }
 
-    // تحليل الصورة
-    const img    = await createImageBitmap(blob);
-    let   code   = null;
+    let code = null;
+    const img = await createImageBitmap(blob);
 
-    // BarcodeDetector على الصورة الكاملة
     if ('BarcodeDetector' in window) {
       try {
-        const det = new BarcodeDetector({
-          formats: ['ean_13','ean_8','code_128','upc_a','upc_e','itf','code_39','qr_code','data_matrix']
-        });
-        const res = await det.detect(img);
+        const res = await new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','upc_a','upc_e','itf','code_39','qr_code','data_matrix'] }).detect(img);
         if (res.length) code = res[0].rawValue;
       } catch(e) {}
     }
-
-    // fallback: html5-qrcode scanFile
     if (!code && typeof Html5Qrcode !== 'undefined') {
-      try {
-        const file = new File([blob], 'snap.jpg', { type: 'image/jpeg' });
-        code = await Html5Qrcode.scanFile(file, false).catch(() => null);
-      } catch(e) {}
+      code = await Html5Qrcode.scanFile(new File([blob],'snap.jpg',{type:'image/jpeg'}), false).catch(()=>null);
     }
 
-    if (code) {
-      onBarcodeFound(code);
-      stopScanner();
-    } else {
+    if (code) { onBarcodeFound(code); stopScanner(); }
+    else {
       capBtn.innerHTML = '❌ لم يُقرأ — حاول مجدداً';
       capBtn.disabled  = false;
-      setTimeout(() => {
-        capBtn.innerHTML = '📸 التقط وامسح';
-      }, 1500);
+      setTimeout(() => { capBtn.innerHTML = '📸 التقط وامسح'; }, 1500);
     }
-  } catch(e) {
-    capBtn.innerHTML = '📸 التقط وامسح';
-    capBtn.disabled  = false;
-  }
+  } catch(e) { capBtn.innerHTML = '📸 التقط وامسح'; capBtn.disabled = false; }
 }
 
-// إعادة التركيز عند اللمس
+// ── لمس الشاشة → إعادة التركيز ──
 async function refocusCamera() {
   if (!scanStream) return;
   try {
     const track = scanStream.getVideoTracks()[0];
     const caps  = track.getCapabilities();
-    // إيقاف ثم إعادة تشغيل الفوكس — يجبر الكاميرا على إعادة الضبط
     if (caps.focusMode?.includes('continuous')) {
       await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] });
       setTimeout(async () => {
         try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e) {}
-      }, 100);
+      }, 80);
     }
   } catch(e) {}
 }
@@ -808,15 +721,35 @@ function stopScanner() {
   btn.disabled = false;
 }
 
+// ── صوت البيب عند المسح (بدون مكتبة) ──
+function playBeep() {
+  try {
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type      = 'sine';
+    osc.frequency.setValueAtTime(1800, ctx.currentTime);          // تون عالي واضح
+    gain.gain.setValueAtTime(0.6, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.18);
+    setTimeout(() => ctx.close(), 300);
+  } catch(e) {}
+}
+
 function onBarcodeFound(code) {
-  if (navigator.vibrate) navigator.vibrate([60, 30, 80]);
+  // صوت + اهتزاز
+  playBeep();
+  if (navigator.vibrate) navigator.vibrate([40, 20, 60]);
 
   // وميض أخضر
   const wrap  = document.getElementById('scanner-container');
   const flash = document.createElement('div');
   flash.className = 'scanner-flash';
   wrap.appendChild(flash);
-  setTimeout(() => flash.remove(), 600);
+  setTimeout(() => flash.remove(), 500);
 
   document.getElementById('search-input').value = code;
   setSearchType('barcode');
