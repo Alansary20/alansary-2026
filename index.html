@@ -279,17 +279,17 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
       <div class="upload-area" onclick="document.getElementById('excel-file').click()">
         <div class="upload-icon">📊</div>
         <div class="upload-text">انقر لرفع ملف إكسل</div>
-        <div class="upload-hint">يدعم .xlsx و .xlsm</div>
+        <div class="upload-hint">يدعم .xlsm و .xlsx — B:باركود C:رقم الصنف E:الاسم G:أصلي H:مهرجان</div>
       </div>
-      <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="handleExcelUpload(event)">
+      <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none" onchange="handleExcelUpload(event)">
       <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
     </div>
 
     <div class="form-card">
       <div class="form-title">📦 رفع ملف رصيد Excel</div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.6">
-        ملف الرصيد يجب أن يحتوي على عمودين:<br>
-        <strong>العمود A:</strong> رقم الصنف &nbsp;|&nbsp; <strong>العمود B:</strong> الكمية
+        يدعم ملف <strong>Dynamics</strong> مباشرةً (عمود الفعلي النهائي تلقائياً)<br>
+        أو ملف بسيط: <strong>العمود A</strong> رقم الصنف | <strong>العمود B</strong> الكمية
       </div>
       <div class="upload-area" onclick="document.getElementById('stock-file').click()">
         <div class="upload-icon">📦</div>
@@ -332,13 +332,18 @@ let LOCAL_PRODUCTS = JSON.parse(localStorage.getItem('local_products') || '{}');
 // Merge local into maps
 function mergeLocal() {
   Object.values(LOCAL_PRODUCTS).forEach(p => {
+    if (!p.c) return;
+    // حماية من بيانات قديمة أو ناقصة
+    const name = p.n || p.name || '';
+    const orig = parseFloat(p.o ?? p.orig ?? 0) || 0;
+    const sale = parseFloat(p.s ?? p.sale ?? 0) || 0;
+    const disc = p.d ?? p.disc ?? (orig > 0 && sale > 0 ? Math.round((orig-sale)/orig*100) : 0);
+    const stk  = p.stk !== undefined ? p.stk : undefined;
+    if (!name || !orig || !sale) return; // تجاهل سجلات ناقصة
+    const product = [p.c, name, orig, sale, disc, stk];
     const idx = CODE_MAP[p.c];
-    if (idx !== undefined) {
-      PRODUCTS[idx] = [p.c, p.n, p.o, p.s, p.d, p.stk];
-    } else {
-      CODE_MAP[p.c] = PRODUCTS.length;
-      PRODUCTS.push([p.c, p.n, p.o, p.s, p.d, p.stk]);
-    }
+    if (idx !== undefined) { PRODUCTS[idx] = product; }
+    else { CODE_MAP[p.c] = PRODUCTS.length; PRODUCTS.push(product); }
     if (p.b) BARCODE_MAP[p.b] = CODE_MAP[p.c];
   });
 }
@@ -956,7 +961,7 @@ function showSuccess() {
   setTimeout(() => b.style.display = 'none', 3000);
 }
 
-// Excel upload
+// Excel upload — يقرأ ملف المنتجات (B=باركود، C=رقم الصنف، E=الاسم، G=أصلي، H=مهرجان)
 async function handleExcelUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -964,26 +969,26 @@ async function handleExcelUpload(event) {
   status.textContent = '⏳ جاري معالجة الملف...';
   try {
     const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array'});
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    const wb  = XLSX.read(buf, { type: 'array' });
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
     let count = 0;
     rows.forEach(row => {
-      const b = String(row[1]||'').trim().replace('.0','');
-      const c = String(row[2]||'').trim();
-      const n = String(row[4]||'').trim();
-      const o = parseFloat(row[6]);
-      const s = parseFloat(row[7]);
+      const b = String(row[1] || '').trim().replace(/\.0$/, '');  // B: باركود
+      const c = String(row[2] || '').trim();                        // C: رقم الصنف
+      const n = String(row[4] || '').trim();                        // E: اسم المنتج
+      const o = parseFloat(row[6]);                                  // G: السعر الأصلي
+      const s = parseFloat(row[7]);                                  // H: سعر المهرجان
       if (!c || !n || !o || !s || n.length < 2) return;
       const d = Math.round((o - s) / o * 100);
-      // حفظ رصيد موجود إن وجد
+      // الحفاظ على الرصيد الموجود عند إعادة رفع المنتجات
       const existIdx = CODE_MAP[c];
-      const prevStk = existIdx !== undefined ? PRODUCTS[existIdx][5] : undefined;
-      const product = [c, n, o, s, d, prevStk];
-      const idx = CODE_MAP[c];
-      if (idx !== undefined) { PRODUCTS[idx] = product; } else { CODE_MAP[c] = PRODUCTS.length; PRODUCTS.push(product); }
+      const prevStk  = existIdx !== undefined ? PRODUCTS[existIdx][5] : undefined;
+      const product  = [c, n, o, s, d, prevStk];
+      if (existIdx !== undefined) { PRODUCTS[existIdx] = product; }
+      else { CODE_MAP[c] = PRODUCTS.length; PRODUCTS.push(product); }
       if (b) BARCODE_MAP[b] = CODE_MAP[c];
-      LOCAL_PRODUCTS[c] = {b, c, n, o, s: Math.round(s), d, stk: prevStk};
+      LOCAL_PRODUCTS[c] = { b, c, n, o, s, d, stk: prevStk };
       count++;
     });
     localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
@@ -994,23 +999,32 @@ async function handleExcelUpload(event) {
   }
 }
 
-// Stock Upload
+// Stock Upload — يدعم ملف Dynamics (رقم الصنف في A، الفعلي النهائي في F)
+// وملف بسيط (رقم الصنف في A، الكمية في B)
 async function handleStockUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
   const status = document.getElementById('stock-status');
   status.textContent = '⏳ جاري معالجة الرصيد...';
   try {
-    const buf = await file.arrayBuffer();
-    const wb  = XLSX.read(buf, { type: 'array' });
-    const ws  = wb.Sheets[wb.SheetNames[0]];
+    const buf  = await file.arrayBuffer();
+    const wb   = XLSX.read(buf, { type: 'array' });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    let updated = 0, notFound = 0;
+    if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
+
+    // اكتشاف تلقائي: هل هو ملف Dynamics أم بسيط؟
+    const header  = rows[0].map(h => String(h).trim());
+    const isDynamics = header.includes('الفعلي النهائي');
+    const colCode = isDynamics ? 0 : 0;
+    const colQty  = isDynamics ? header.indexOf('الفعلي النهائي') : 1;
+
+    let updated = 0, notFound = 0, skipped = 0;
     rows.forEach((row, ri) => {
       if (ri === 0) return; // تجاوز رأس الجدول
-      const c   = String(row[0] || '').trim();
-      const qty = row[1] !== '' ? Number(row[1]) : null;
-      if (!c || qty === null || isNaN(qty)) return;
+      const c   = String(row[colCode] || '').trim();
+      const qty = row[colQty] !== '' ? Number(row[colQty]) : null;
+      if (!c || qty === null || isNaN(qty)) { skipped++; return; }
       const idx = CODE_MAP[c];
       if (idx !== undefined) {
         PRODUCTS[idx][5] = qty;
@@ -1019,8 +1033,20 @@ async function handleStockUpload(event) {
         updated++;
       } else { notFound++; }
     });
+
+    // كل منتج غير موجود في ملف الرصيد → رصيده 0
+    PRODUCTS.forEach((p, i) => {
+      if (p[5] === undefined || p[5] === null) {
+        PRODUCTS[i][5] = 0;
+        const c = p[0];
+        if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = 0;
+        else LOCAL_PRODUCTS[c] = { c, stk: 0 };
+      }
+    });
     localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
-    status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated} منتج</span>${notFound?` — <span style="color:var(--text3)">${notFound} صنف غير موجود</span>`:''}`;
+    const src = isDynamics ? '(Dynamics)' : '(ملف بسيط)';
+    status.innerHTML = `<span style="color:var(--green)">✅ ${src} تم تحديث رصيد ${updated} منتج</span>`
+      + (notFound ? ` — <span style="color:var(--text3)">${notFound} غير موجود</span>` : '');
     event.target.value = '';
   } catch(e) {
     status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
