@@ -348,6 +348,21 @@ function mergeLocal() {
   });
 }
 mergeLocal();
+applyStoredStock(); // تطبيق الرصيد المحفوظ على جميع المنتجات
+
+// تطبيق الرصيد المحفوظ على كل المنتجات عند التحميل
+function applyStoredStock() {
+  const stored = JSON.parse(localStorage.getItem('stock_data') || '{}');
+  // أيضاً اقرأ من LOCAL_PRODUCTS كـ fallback
+  PRODUCTS.forEach((p, i) => {
+    const c = p[0];
+    if (stored[c] !== undefined) {
+      PRODUCTS[i][5] = stored[c];
+    } else if (LOCAL_PRODUCTS[c] && LOCAL_PRODUCTS[c].stk !== undefined) {
+      PRODUCTS[i][5] = LOCAL_PRODUCTS[c].stk;
+    }
+  });
+}
 
 let searchType = 'barcode';
 let listItems = [];
@@ -1019,12 +1034,14 @@ async function handleStockUpload(event) {
     const colCode = isDynamics ? 0 : 0;
     const colQty  = isDynamics ? header.indexOf('الفعلي النهائي') : 1;
 
+    const stockData = {}; // سجل الرصيد المنفصل
     let updated = 0, notFound = 0, skipped = 0;
     rows.forEach((row, ri) => {
       if (ri === 0) return; // تجاوز رأس الجدول
       const c   = String(row[colCode] || '').trim();
       const qty = row[colQty] !== '' ? Number(row[colQty]) : null;
       if (!c || qty === null || isNaN(qty)) { skipped++; return; }
+      stockData[c] = qty; // حفظ في السجل المنفصل
       const idx = CODE_MAP[c];
       if (idx !== undefined) {
         PRODUCTS[idx][5] = qty;
@@ -1039,10 +1056,14 @@ async function handleStockUpload(event) {
       if (p[5] === undefined || p[5] === null) {
         PRODUCTS[i][5] = 0;
         const c = p[0];
+        stockData[c] = 0;
         if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = 0;
         else LOCAL_PRODUCTS[c] = { c, stk: 0 };
       }
     });
+
+    // حفظ الرصيد في مفتاح منفصل يبقى عند إعادة رفع المنتجات
+    localStorage.setItem('stock_data', JSON.stringify(stockData));
     localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
     const src = isDynamics ? '(Dynamics)' : '(ملف بسيط)';
     status.innerHTML = `<span style="color:var(--green)">✅ ${src} تم تحديث رصيد ${updated} منتج</span>`
