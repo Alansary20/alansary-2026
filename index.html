@@ -497,229 +497,110 @@ function clearResult() {
 }
 
 // ====== SCANNER — getUserMedia أولاً + html5-qrcode stream ======
-let scanStream   = null;
-let h5qr         = null;
-let scanning     = false;
-let scanCanvas   = null;
-let scanCtx      = null;
-let scanTimer    = null;
+// ══════════════════════════════════════════════
+//  ماسح الباركود — Html5QrcodeScanner (mebjas/html5-qrcode)
+// ══════════════════════════════════════════════
+let h5scanner = null;
+let scanning  = false;
 
 async function toggleScanner() {
   if (scanning) { stopScanner(); return; }
   const btn = document.getElementById('scanner-toggle-btn');
   btn.innerHTML = '⏳ جاري التشغيل...';
-  btn.disabled = true;
-  await startScanner();
+  btn.disabled  = true;
+  startScanner();
 }
 
-async function startScanner() {
+function startScanner() {
   const btn       = document.getElementById('scanner-toggle-btn');
   const container = document.getElementById('scanner-container');
-  const video     = document.getElementById('scanner-video');
 
-  // ── الخطوة 1: تشغيل الكاميرا بإعدادات الجهاز الافتراضية — بدون أي تعديل ──
-  // كاميرا خلفية بأعلى دقة ممكنة — الجهاز يختار باقي الإعدادات
-  const camConfigs = [
-    { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } },
-    { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
-    { video: { facingMode: 'environment' } },
-    { video: { width: { ideal: 1280 }, height: { ideal: 720 } } },
-    { video: true }
-  ];
-  for (const cfg of camConfigs) {
-    try { scanStream = await navigator.mediaDevices.getUserMedia(cfg); break; }
-    catch(e) { scanStream = null; }
-  }
+  try {
+    container.style.display = 'block';
+    document.getElementById('scanner-video').style.display = 'none';
+    document.getElementById('capture-btn').style.display   = 'none';
 
-  if (!scanStream) {
+    if (h5scanner) { try { h5scanner.clear(); } catch(e) {} h5scanner = null; }
+    document.getElementById('qr-reader').innerHTML = '';
+
+    h5scanner = new Html5QrcodeScanner(
+      'qr-reader',
+      {
+        fps: 15,
+        qrbox: { width: 260, height: 150 },
+        aspectRatio: 1.6,
+        rememberLastUsedCamera: true,
+        showTorchButtonIfSupported: true,
+        showZoomSliderIfSupported: false,
+        useBarCodeDetectorIfSupported: true,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.DATA_MATRIX
+        ],
+        videoConstraints: {
+          facingMode: 'environment',
+          width:  { ideal: 1280 },
+          height: { ideal: 720  }
+        },
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+      },
+      (decodedText) => { onBarcodeFound(decodedText); stopScanner(); },
+      () => {}
+    );
+
+    h5scanner.render('qr-reader');
+    setTimeout(cleanH5UI, 700);
+
+    scanning = true;
+    btn.innerHTML = '⏹️ إيقاف السكانر';
+    btn.style.background = 'var(--red)';
+    btn.disabled = false;
+
+  } catch(err) {
+    scanning = false;
+    container.style.display = 'none';
     btn.innerHTML = '📷 تشغيل السكانر';
     btn.style.background = '';
     btn.disabled = false;
-    document.getElementById('result-area').innerHTML =
-      `<div class="error-card">❌ تعذّر الوصول للكاميرا. تأكد من منح الإذن للتطبيق في إعدادات الجهاز.</div>`;
-    return;
+    const msg = String(err).toLowerCase();
+    let text = '❌ تعذّر تشغيل الكاميرا.';
+    if (msg.includes('permission') || msg.includes('denied') || msg.includes('notallowed'))
+      text = '❌ تم رفض إذن الكاميرا. افتح إعدادات الجهاز وامنح الإذن.';
+    document.getElementById('result-area').innerHTML = `<div class="error-card">${text}</div>`;
   }
-
-  // ── الخطوة 2: عرض الفيديو ──
-  video.srcObject = scanStream;
-  video.setAttribute('playsinline', '');
-  video.setAttribute('muted', '');
-  await new Promise(res => {
-    video.onloadedmetadata = () => video.play().then(res).catch(res);
-    setTimeout(res, 3000);
-  });
-
-  // تفعيل أفضل فوكس ممكن للمسافة القريبة
-  try {
-    const track = scanStream.getVideoTracks()[0];
-    const caps  = track.getCapabilities();
-    const adv   = [];
-
-    // أولوية: macro > continuous — كلاهما يعمل على المسافة القريبة
-    if (caps.focusMode?.includes('macro'))           adv.push({ focusMode: 'macro' });
-    else if (caps.focusMode?.includes('continuous')) adv.push({ focusMode: 'continuous' });
-
-    // focusDistance: أصغر قيمة = أقرب مسافة تركيز
-    if (caps.focusDistance) {
-      const minDist = caps.focusDistance.min ?? 0;
-      adv.push({ focusDistance: minDist });
-    }
-
-    if (adv.length) await track.applyConstraints({ advanced: adv });
-  } catch(e) {}
-
-  container.style.display = 'block';
-  scanning = true;
-  btn.innerHTML = '⏹️ إيقاف السكانر';
-  btn.style.background = 'var(--red)';
-  btn.disabled = false;
-
-  document.getElementById('capture-btn').style.display = 'block';
-  video.addEventListener('click', refocusCamera, { passive: true });
-
-    // ── الخطوة 3: تشغيل المحرك ──
-  startScanEngine(video);
 }
 
-// ══════════════════════════════════════════════
-//  محرك المسح الموحّد — سريع، دقيق، بدون تعقيد
-// ══════════════════════════════════════════════
-function startScanEngine(video) {
-  // إعداد BarcodeDetector — الأسرع والأدق على Android/Chrome
-  const FORMATS = ['ean_13','ean_8','code_128','upc_a','upc_e','itf','code_39','qr_code','data_matrix'];
-  const detector = ('BarcodeDetector' in window) ? new BarcodeDetector({ formats: FORMATS }) : null;
-
-  // Canvas للـ fallback
-  scanCanvas = document.createElement('canvas');
-  scanCtx    = scanCanvas.getContext('2d', { willReadFrequently: true });
-
-  let lastCode = '', streak = 0, busy = false;
-  let useVideo = true; // نجرب الفيديو مباشرة أولاً، ثم Canvas إن فشل
-
-  scanTimer = setInterval(async () => {
-    if (!scanning || busy || video.readyState < 2) return;
-    busy = true;
-    try {
-      let results = [];
-
-      if (detector) {
-        if (useVideo) {
-          try {
-            results = await detector.detect(video); // الأسرع — بدون canvas
-          } catch(e) {
-            useVideo = false; // هذا الجهاز لا يدعم detect(video) — نتحول للـ Canvas
-          }
-        }
-        if (!useVideo) {
-          scanCanvas.width  = video.videoWidth  || 640;
-          scanCanvas.height = video.videoHeight || 480;
-          scanCtx.drawImage(video, 0, 0);
-          results = await detector.detect(scanCanvas);
-        }
-      } else if (typeof Html5Qrcode !== 'undefined') {
-        // fallback نهائي: html5-qrcode
-        scanCanvas.width  = video.videoWidth  || 640;
-        scanCanvas.height = video.videoHeight || 480;
-        scanCtx.drawImage(video, 0, 0);
-        const blob = await new Promise(r => scanCanvas.toBlob(r, 'image/jpeg', 0.92));
-        if (blob) {
-          const code = await Html5Qrcode.scanFile(new File([blob],'f.jpg',{type:'image/jpeg'}), false).catch(()=>null);
-          if (code) results = [{ rawValue: code }];
-        }
-      }
-
-      if (results.length > 0) {
-        const code = results[0].rawValue;
-        if (code === lastCode) { streak++; } else { lastCode = code; streak = 1; }
-        if (streak >= 2) {
-          clearInterval(scanTimer); scanTimer = null;
-          onBarcodeFound(code);
-          setTimeout(() => { if (scanning) stopScanner(); }, 400);
-        }
-      } else { lastCode = ''; streak = 0; }
-    } catch(e) {}
-    busy = false;
-  }, 120); // كل 120ms = ~8 إطار/ثانية
-}
-
-// ── التقاط صورة يدوياً بأعلى جودة ──
-async function captureAndScan() {
-  if (!scanStream) return;
-  const capBtn = document.getElementById('capture-btn');
-  capBtn.disabled = true;
-  capBtn.innerHTML = '⏳ جاري التحليل...';
-
-  const video = document.getElementById('scanner-video');
-  try {
-    let blob = null;
-    const track = scanStream.getVideoTracks()[0];
-
-    // ImageCapture: أعلى جودة — مثل تطبيق الكاميرا
-    if (typeof ImageCapture !== 'undefined') {
-      try { blob = await new ImageCapture(track).takePhoto(); } catch(e) {}
-    }
-    // fallback: canvas
-    if (!blob) {
-      const cv = document.createElement('canvas');
-      cv.width  = video.videoWidth  || 1280;
-      cv.height = video.videoHeight || 720;
-      cv.getContext('2d').drawImage(video, 0, 0);
-      blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 1.0));
-    }
-
-    let code = null;
-    const img = await createImageBitmap(blob);
-
-    if ('BarcodeDetector' in window) {
-      try {
-        const res = await new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','upc_a','upc_e','itf','code_39','qr_code','data_matrix'] }).detect(img);
-        if (res.length) code = res[0].rawValue;
-      } catch(e) {}
-    }
-    if (!code && typeof Html5Qrcode !== 'undefined') {
-      code = await Html5Qrcode.scanFile(new File([blob],'snap.jpg',{type:'image/jpeg'}), false).catch(()=>null);
-    }
-
-    if (code) { onBarcodeFound(code); stopScanner(); }
-    else {
-      capBtn.innerHTML = '❌ لم يُقرأ — حاول مجدداً';
-      capBtn.disabled  = false;
-      setTimeout(() => { capBtn.innerHTML = '📸 التقط وامسح'; }, 1500);
-    }
-  } catch(e) { capBtn.innerHTML = '📸 التقط وامسح'; capBtn.disabled = false; }
-}
-
-// ── لمس الشاشة → إعادة التركيز ──
-async function refocusCamera() {
-  if (!scanStream) return;
-  try {
-    const track = scanStream.getVideoTracks()[0];
-    const caps  = track.getCapabilities();
-    if (caps.focusMode?.includes('continuous')) {
-      await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] });
-      setTimeout(async () => {
-        try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e) {}
-      }, 80);
-    }
-  } catch(e) {}
+function cleanH5UI() {
+  ['#qr-reader__header_message','#qr-reader__status_span',
+   '#qr-reader__dashboard_section_swaplink','#qr-reader__filescan_input',
+   '#qr-reader__dashboard','#qr-reader img'
+  ].forEach(sel => document.querySelectorAll(sel).forEach(el => { el.style.display='none'; }));
+  const r = document.getElementById('qr-reader');
+  if (r) { r.style.border='none'; r.style.padding='0'; }
 }
 
 function stopScanner() {
-  if (scanTimer)  { clearInterval(scanTimer); scanTimer = null; }
-  document.getElementById('capture-btn').style.display = 'none';
-  const _vid = document.getElementById('scanner-video');
-  _vid.removeEventListener('click', refocusCamera);
-  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
-  try { if (h5qr) { h5qr.clear(); h5qr = null; } } catch(e) {}
-  scanning   = false;
-  scanCanvas = null;
-  scanCtx    = null;
+  try { if (h5scanner) { h5scanner.clear().catch(()=>{}); h5scanner = null; } } catch(e) {}
+  scanning = false;
+  document.getElementById('scanner-video').style.display    = '';
   document.getElementById('scanner-container').style.display = 'none';
+  document.getElementById('capture-btn').style.display       = 'none';
+  document.getElementById('qr-reader').innerHTML             = '';
   const btn = document.getElementById('scanner-toggle-btn');
   btn.innerHTML = '📷 تشغيل السكانر';
   btn.style.background = '';
   btn.disabled = false;
 }
+
+async function captureAndScan() {}
+async function refocusCamera()  {}
 
 // ── صوت البيب عند المسح (بدون مكتبة) ──
 function playBeep() {
