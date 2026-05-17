@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>الأنصاري 2026</title>
+<title>الأنصاري — الأسعار والمخزون</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -172,7 +172,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 <body>
 <div id="app">
   <div class="hdr">
-    <div class="hdr-title">🛒 <span class="hdr-gold">الأنصاري</span> — أسعار المهرجان</div>
+    <div class="hdr-title">🛒 <span class="hdr-gold">الأنصاري</span> — برنامج الأسعار والمخزون</div>
     <div class="hdr-sub">2026 م</div>
   </div>
   <div class="nav">
@@ -257,7 +257,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
           <input class="form-input" type="number" id="f-orig" placeholder="0" inputmode="decimal" oninput="calcDiscount()">
         </div>
         <div>
-          <label class="form-label">سعر المهرجان (ر.س)</label>
+          <label class="form-label">السعر بعد الخصم (ر.س)</label>
           <input class="form-input" type="number" id="f-sale" placeholder="0" inputmode="decimal" oninput="calcDiscount()">
         </div>
       </div>
@@ -485,7 +485,7 @@ function renderPricesGrid(p) {
   const gridClass = stock !== null ? 'prices-grid with-stock' : 'prices-grid';
   return `<div class="${gridClass}">
     <div class="price-box before"><div class="price-label">السعر الأصلي</div><div class="price-val">${p[2]}<span class="unit"> ر.س</span></div></div>
-    <div class="price-box after"><div class="price-label">سعر المهرجان</div><div class="price-val">${p[3]}<span class="unit"> ر.س</span></div></div>
+    <div class="price-box after"><div class="price-label">السعر بعد الخصم</div><div class="price-val">${p[3]}<span class="unit"> ر.س</span></div></div>
     <div class="price-box discount"><div class="price-label">نسبة الخصم</div><div class="price-val">${p[4]}<span class="unit">%</span></div></div>
     ${stockBox}
   </div>`;
@@ -1076,7 +1076,7 @@ async function handleStockUpload(event) {
 
 // Export
 function exportData() {
-  const rows = [['الباركود','رقم الصنف','اسم المنتج','السعر الأصلي','سعر المهرجان','نسبة الخصم','الرصيد']];
+  const rows = [['الباركود','رقم الصنف','اسم المنتج','السعر الأصلي','السعر بعد الخصم','نسبة الخصم','الرصيد']];
   // Build barcode reverse map
   const idx2barcodes = {};
   Object.entries(BARCODE_MAP).forEach(([b, idx]) => {
