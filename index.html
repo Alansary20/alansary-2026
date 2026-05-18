@@ -520,12 +520,33 @@ function startScanner() {
     stopScanner();
   }
 
-  h5scanner = new Html5QrcodeScanner(
-    'qr-reader',
-    { fps: 10, qrbox: { width: 250, height: 250 } },
-    /* verbose= */ false
-  );
-  h5scanner.render(onScanSuccess);
+  // اختيار camera 0 facing back تلقائياً — الأفضل في هذا الجهاز
+  Html5Qrcode.getCameras().then(cameras => {
+    if (!cameras || !cameras.length) throw new Error('no cameras');
+
+    // أولوية: camera 0 facing back
+    const preferred = cameras.find(c => /camera 0/i.test(c.label) && /back/i.test(c.label))
+      || cameras.find(c => /back|rear/i.test(c.label))
+      || cameras[cameras.length - 1];
+
+    const h5qr = new Html5Qrcode('qr-reader', false);
+    h5scanner = h5qr;
+
+    h5qr.start(
+      preferred.id,
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      onScanSuccess,
+      () => {}
+    ).catch(() => {
+      h5qr.clear().catch(() => {});
+      h5scanner = new Html5QrcodeScanner('qr-reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+      h5scanner.render(onScanSuccess);
+    });
+
+  }).catch(() => {
+    h5scanner = new Html5QrcodeScanner('qr-reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+    h5scanner.render(onScanSuccess);
+  });
 
   scanning = true;
   document.getElementById('scanner-toggle-btn').innerHTML = '⏹️ إيقاف السكانر';
@@ -534,7 +555,17 @@ function startScanner() {
 }
 
 function stopScanner() {
-  try { if (h5scanner) { h5scanner.clear(); h5scanner = null; } } catch(e) {}
+  try {
+    if (h5scanner) {
+      // Html5Qrcode.stop() ثم clear() — Html5QrcodeScanner يستخدم clear() فقط
+      if (typeof h5scanner.stop === 'function') {
+        h5scanner.stop().catch(() => {}).finally(() => { try { h5scanner.clear(); } catch(e) {} });
+      } else {
+        h5scanner.clear();
+      }
+      h5scanner = null;
+    }
+  } catch(e) {}
   scanning = false;
   document.getElementById('scanner-video').style.display     = '';
   document.getElementById('scanner-container').style.display = 'none';
