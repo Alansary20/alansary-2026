@@ -416,18 +416,20 @@ let LOCAL_PRODUCTS = JSON.parse(localStorage.getItem('local_products') || '{}');
 function mergeLocal() {
   Object.values(LOCAL_PRODUCTS).forEach(p => {
     if (!p.c) return;
-    // حماية من بيانات قديمة أو ناقصة
     const name = p.n || p.name || '';
     const orig = parseFloat(p.o ?? p.orig ?? 0) || 0;
-    const sale = parseFloat(p.s ?? p.sale ?? 0) || 0;
-    const disc = p.d ?? p.disc ?? (orig > 0 && sale > 0 ? Math.round((orig-sale)/orig*100) : 0);
+    const sale = parseFloat(p.s ?? p.sale ?? orig) || orig; // sale=0 مقبول، fallback للأصلي
+    const disc = p.d ?? p.disc ?? (orig > 0 ? Math.round((orig - sale) / orig * 100) : 0);
     const stk  = p.stk !== undefined ? p.stk : undefined;
-    if (!name || !orig || !sale) return; // تجاهل سجلات ناقصة
+    // اقبل السجل إذا كان فيه رقم صنف + اسم + سعر أصلي على الأقل
+    if (!name || !orig) return;
     const product = [p.c, name, orig, sale, disc, stk];
     const idx = CODE_MAP[p.c];
     if (idx !== undefined) { PRODUCTS[idx] = product; }
     else { CODE_MAP[p.c] = PRODUCTS.length; PRODUCTS.push(product); }
-    if (p.b) BARCODE_MAP[p.b] = CODE_MAP[p.c];
+    // دعم الباركودات المتعددة: p.barcodes = [] أو p.b = string
+    const barcodes = Array.isArray(p.barcodes) ? p.barcodes : (p.b ? [p.b] : []);
+    barcodes.forEach(b => { if (b) BARCODE_MAP[b] = CODE_MAP[p.c]; });
   });
 }
 mergeLocal();
@@ -894,7 +896,7 @@ function saveProduct() {
   const n = document.getElementById('f-name').value.trim();
   const o = parseFloat(document.getElementById('f-orig').value);
   const s = parseFloat(document.getElementById('f-sale').value);
-  if (!c || !n || !o || !s) { alert('يرجى ملء جميع الحقول الإلزامية'); return; }
+  if (!c || !n || isNaN(o) || o <= 0) { alert('يرجى ملء جميع الحقول الإلزامية (الباركود والاسم والسعر الأصلي)'); return; }
   const d = Math.round((o - s) / o * 100);
   const stk = document.getElementById('f-stock') ? document.getElementById('f-stock').value.trim() : '';
   const product = [c, n, o, s, d, stk !== '' ? Number(stk) : undefined];
@@ -951,31 +953,51 @@ function buildPreviewTable(rows, containerId, maxCols) {
 }
 
 function readFileRobust(file) {
-  return new Promise((resolve, reject) => {
-    // محاولة arrayBuffer أولاً (أسرع)، ثم FileReader كـ fallback لأندرويد
-    if (file.arrayBuffer) {
-      file.arrayBuffer()
-        .then(buf => resolve({ data: new Uint8Array(buf), type: 'array' }))
-        .catch(() => fallbackReader());
-    } else {
-      fallbackReader();
-    }
-    function fallbackReader() {
+  function cloneToBlob(f) {
+    return new Promise((res) => {
+      const r = new FileReader();
+      r.onload = e => res(new Blob([e.target.result], { type: 'application/octet-stream' }));
+      r.onerror = () => res(f);
+      r.readAsArrayBuffer(f);
+    });
+  }
+  return cloneToBlob(file).then(blob => new Promise((resolve, reject) => {
+    function tryRead(src, method) {
       const reader = new FileReader();
-      reader.onload = e => {
-        const data = e.target.result;
-        if (typeof data === 'string') {
-          resolve({ data, type: 'binary' });
-        } else {
-          resolve({ data: new Uint8Array(data), type: 'array' });
-        }
+      reader.onload  = e => resolve(e.target.result);
+      reader.onerror = () => {
+        if (method === 'buffer') tryRead(src, 'binary');
+        else if (method === 'binary') tryRead(src, 'url');
+        else if (src !== file) tryRead(file, 'buffer');
+        else reject(new Error('تعذّر قراءة الملف'));
       };
-      reader.onerror = () => reject(new Error('تعذّر قراءة الملف'));
-      // readAsBinaryString أكثر توافقاً على أندرويد القديم
-      try { reader.readAsArrayBuffer(file); }
-      catch(e) { reader.readAsBinaryString(file); }
+      if (method === 'buffer') reader.readAsArrayBuffer(src);
+      else if (method === 'binary') reader.readAsBinaryString(src);
+      else reader.readAsDataURL(src);
     }
+    tryRead(blob, 'buffer');
+  })).then(result => {
+    if (result instanceof ArrayBuffer) return { data: new Uint8Array(result), type: 'array' };
+    if (typeof result === 'string' && result.startsWith('data:')) return { data: result.split(',')[1], type: 'base64' };
+    return { data: result, type: 'binary' };
   });
+}
+
+function parseWorkbook(data, type) {
+  const optionSets = [
+    { cellDates: true,  dense: false, bookVBA: false },
+    { cellDates: false, dense: false, bookVBA: false },
+    { raw: true,        dense: false, bookVBA: false },
+    { raw: true,        dense: false, bookVBA: true  },
+  ];
+  let lastErr;
+  for (const opts of optionSets) {
+    try {
+      const wb = XLSX.read(data, { ...opts, type });
+      if (wb && wb.SheetNames && wb.SheetNames.length) return wb;
+    } catch(e) { lastErr = e; }
+  }
+  throw lastErr || new Error('فشلت قراءة الملف');
 }
 
 async function handleExcelUpload(event) {
@@ -985,7 +1007,7 @@ async function handleExcelUpload(event) {
   status.textContent = '⏳ جاري قراءة الملف...';
   try {
     const { data, type } = await readFileRobust(file);
-    const wb   = XLSX.read(data, { type, cellDates: true, dense: false });
+    const wb   = parseWorkbook(data, type);
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
     if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
@@ -1031,58 +1053,60 @@ function confirmColMap() {
   errEl.style.display = 'none';
 
   const status = document.getElementById('upload-status');
-  const hasExistingData = Object.keys(CODE_MAP).length > 0;
   let countNew = 0, countUpdated = 0, countSkipped = 0;
 
   // تخطّ الصف الأول (رأس) إذا كان نصياً
   const startRow = isNaN(parseFloat(rows[0][colO])) ? 1 : 0;
+
   rows.forEach((row, ri) => {
     if (ri < startRow) return;
-    const b = String(row[colB] !== undefined ? row[colB] : '').trim().replace(/\.0$/, '');
+
+    // تنظيف الباركود — يمكن أن يكون فارغاً
+    const b = String(row[colB] !== undefined && row[colB] !== null ? row[colB] : '').trim().replace(/\.0+$/, '');
     const c = String(row[colC] || '').trim();
     const n = String(row[colN] || '').trim();
     const o = parseFloat(row[colO]);
-    const s = parseFloat(row[colS]);
-    if (!c || !n || !o || !s || n.length < 2) return;
+    // السعر بعد الخصم: إذا كان غائباً أو صفراً استخدم السعر الأصلي
+    const sRaw = parseFloat(row[colS]);
+    const s = (!isNaN(sRaw) && sRaw > 0) ? sRaw : o;
+
+    // تخطّ الصفوف الفاسدة فقط: لازم رقم صنف + اسم + سعر أصلي
+    if (!c || !n || isNaN(o) || o <= 0 || n.length < 2) { countSkipped++; return; }
+
     const d = Math.round((o - s) / o * 100);
     const existIdx = CODE_MAP[c];
 
-    if (hasExistingData && existIdx !== undefined) {
-      // ✅ المنتج موجود مسبقاً: حدّث السعر الأصلي والسعر بعد الخصم فقط
-      // احتفظ بالاسم والباركود ورقم الصنف من البيانات القديمة
-      const prevProduct = PRODUCTS[existIdx];
-      const prevStk = prevProduct[5];
-      const prevName = prevProduct[1]; // الاسم القديم
-      PRODUCTS[existIdx] = [c, prevName, o, s, d, prevStk];
-      // تحديث LOCAL_PRODUCTS بالأسعار الجديدة فقط، مع الحفاظ على الباركود القديم
+    if (existIdx !== undefined) {
+      // المنتج موجود — حدّث الأسعار واحتفظ بالرصيد والاسم القديم
+      const prev = PRODUCTS[existIdx];
+      const prevStk = prev[5];
+      // استخدم الاسم من الملف الجديد إذا كان موجوداً، وإلا احتفظ بالقديم
+      const updatedName = n || prev[1];
+      PRODUCTS[existIdx] = [c, updatedName, o, s, d, prevStk];
+      // أضف الباركود الجديد إذا لم يكن مسجلاً
+      if (b && BARCODE_MAP[b] === undefined) BARCODE_MAP[b] = existIdx;
       const prevLocal = LOCAL_PRODUCTS[c] || {};
-      const keepBarcode = prevLocal.b || '';
-      LOCAL_PRODUCTS[c] = { ...prevLocal, b: keepBarcode, c, n: prevName, o, s, d, stk: prevStk };
+      const prevBarcodes = Array.isArray(prevLocal.barcodes) ? prevLocal.barcodes : (prevLocal.b ? [prevLocal.b] : []);
+      if (b && !prevBarcodes.includes(b)) prevBarcodes.push(b);
+      LOCAL_PRODUCTS[c] = { ...prevLocal, c, n: updatedName, o, s, d, stk: prevStk, barcodes: prevBarcodes };
       countUpdated++;
-    } else if (!hasExistingData || existIdx === undefined) {
-      // ✅ منتج جديد لا يوجد في البيانات السابقة: أضفه كاملاً
-      const prevStk = existIdx !== undefined ? PRODUCTS[existIdx][5] : undefined;
-      const product = [c, n, o, s, d, prevStk];
-      if (existIdx !== undefined) { PRODUCTS[existIdx] = product; }
-      else { CODE_MAP[c] = PRODUCTS.length; PRODUCTS.push(product); }
-      if (b) BARCODE_MAP[b] = CODE_MAP[c];
-      LOCAL_PRODUCTS[c] = { b, c, n, o, s, d, stk: prevStk };
-      countNew++;
     } else {
-      countSkipped++;
+      // منتج جديد — أضفه كاملاً
+      const idx = PRODUCTS.length;
+      CODE_MAP[c] = idx;
+      PRODUCTS.push([c, n, o, s, d, undefined]);
+      if (b) BARCODE_MAP[b] = idx;
+      LOCAL_PRODUCTS[c] = { c, n, o, s, d, barcodes: b ? [b] : [] };
+      countNew++;
     }
   });
 
   localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
 
-  let msg = '';
-  if (hasExistingData) {
-    msg = `<span style="color:var(--green)">✅ تم تحديث أسعار ${countUpdated} منتج موجود</span>`;
-    if (countNew > 0) msg += ` — <span style="color:#1a4fa8">➕ ${countNew} منتج جديد أضيف</span>`;
-    if (countSkipped > 0) msg += ` — <span style="color:var(--text3)">${countSkipped} تم تخطيه</span>`;
-  } else {
-    msg = `<span style="color:var(--green)">✅ تم تحميل ${countNew} منتج بنجاح!</span>`;
-  }
+  const total = countNew + countUpdated;
+  let msg = `<span style="color:var(--green)">✅ تم تحميل ${total.toLocaleString('ar')} منتج</span>`;
+  if (countNew > 0 && countUpdated > 0) msg = `<span style="color:var(--green)">✅ ${countUpdated.toLocaleString('ar')} محدّث — ➕ ${countNew.toLocaleString('ar')} جديد</span>`;
+  if (countSkipped > 0) msg += ` — <span style="color:var(--text3)">${countSkipped.toLocaleString('ar')} تم تخطيه</span>`;
   status.innerHTML = msg;
   closeColMap();
 }
@@ -1099,7 +1123,7 @@ async function handleStockUpload(event) {
   status.textContent = '⏳ جاري قراءة الملف...';
   try {
     const { data, type } = await readFileRobust(file);
-    const wb   = XLSX.read(data, { type, cellDates: true, dense: false });
+    const wb   = parseWorkbook(data, type);
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
     if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
@@ -1139,22 +1163,29 @@ function confirmStkMap() {
   }
   errEl.style.display = 'none';
 
-  // ✅ مسح جميع الأرصدة القديمة أولاً قبل تطبيق الملف الجديد
+  // تصفير جميع الأرصدة القديمة أولاً
   PRODUCTS.forEach((p, i) => {
     PRODUCTS[i][5] = 0;
-    const c = p[0];
-    if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = 0;
+    if (LOCAL_PRODUCTS[p[0]]) LOCAL_PRODUCTS[p[0]].stk = 0;
   });
 
   const stockData = {};
   let updated = 0, notFound = 0, skipped = 0;
-  // تخطّ الصف الأول (رأس) إذا كان نصياً
   const startRow = isNaN(Number(rows[0][colQty])) ? 1 : 0;
+
   rows.forEach((row, ri) => {
     if (ri < startRow) return;
-    const c   = String(row[colCode] || '').trim();
-    const qty = row[colQty] !== '' ? Number(row[colQty]) : null;
-    if (!c || qty === null || isNaN(qty)) { skipped++; return; }
+    // تنظيف رقم الصنف — إزالة .0 أو مسافات
+    const c = String(row[colCode] !== undefined && row[colCode] !== null ? row[colCode] : '')
+                .trim().replace(/\.0+$/, '');
+    if (!c) { skipped++; return; }
+
+    // الكمية: اقبل الصفر، ارفض فقط القيم غير الرقمية والفارغة تماماً
+    const rawQty = row[colQty];
+    if (rawQty === '' || rawQty === null || rawQty === undefined) { skipped++; return; }
+    const qty = Number(rawQty);
+    if (isNaN(qty)) { skipped++; return; }
+
     stockData[c] = qty;
     const idx = CODE_MAP[c];
     if (idx !== undefined) {
@@ -1162,22 +1193,18 @@ function confirmStkMap() {
       if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = qty;
       else LOCAL_PRODUCTS[c] = { c, stk: qty };
       updated++;
-    } else { notFound++; }
-  });
-
-  // تصفير الأرصدة التي لم تأتِ في الملف الجديد
-  PRODUCTS.forEach((p, i) => {
-    const c = p[0];
-    if (stockData[c] === undefined) {
-      stockData[c] = 0;
+    } else {
+      // حفظ الرصيد حتى لو المنتج غير موجود حالياً (قد يُرفع لاحقاً)
+      LOCAL_PRODUCTS[c] = { c, stk: qty };
+      notFound++;
     }
   });
 
   localStorage.setItem('stock_data', JSON.stringify(stockData));
   localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
   const status = document.getElementById('stock-status');
-  status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated} منتج</span>`
-    + (notFound ? ` — <span style="color:var(--text3)">${notFound} غير موجود</span>` : '');
+  status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>`
+    + (notFound ? ` — <span style="color:var(--text3)">${notFound.toLocaleString('ar')} غير موجود في القائمة</span>` : '');
   closeStkMap();
 }
 
@@ -1236,7 +1263,7 @@ function exportData() {
     barcodes.forEach(b => {
       const orig = parseFloat(p[2]) || 0;
       const sale = parseFloat(p[3]) || 0;
-      const disc = p[4] !== undefined ? p[4] : (orig > 0 && sale > 0 ? Math.round((orig - sale) / orig * 100) : 0);
+      const disc = (p[4] !== undefined && !isNaN(p[4])) ? p[4] : (orig > 0 && sale > 0 ? Math.round((orig - sale) / orig * 100) : 0);
       dataRows.push([
         b,              // باركود
         p[0],           // رقم الصنف
@@ -1389,8 +1416,8 @@ function exportData() {
       }
       if (ci === 6) {
         ws[cellRef].t = 'n';
-        if (discVal > 0) { ws[cellRef].v = discVal / 100; ws[cellRef].z = '0%'; }
-        else { ws[cellRef].v = 0; ws[cellRef].z = '0%'; }
+        ws[cellRef].v = discVal || 0;
+        ws[cellRef].z = '0"%"';
       }
     });
   });
