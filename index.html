@@ -1004,7 +1004,9 @@ function confirmColMap() {
   errEl.style.display = 'none';
 
   const status = document.getElementById('upload-status');
-  let count = 0;
+  const hasExistingData = Object.keys(CODE_MAP).length > 0;
+  let countNew = 0, countUpdated = 0, countSkipped = 0;
+
   // تخطّ الصف الأول (رأس) إذا كان نصياً
   const startRow = isNaN(parseFloat(rows[0][colO])) ? 1 : 0;
   rows.forEach((row, ri) => {
@@ -1017,16 +1019,44 @@ function confirmColMap() {
     if (!c || !n || !o || !s || n.length < 2) return;
     const d = Math.round((o - s) / o * 100);
     const existIdx = CODE_MAP[c];
-    const prevStk  = existIdx !== undefined ? PRODUCTS[existIdx][5] : undefined;
-    const product  = [c, n, o, s, d, prevStk];
-    if (existIdx !== undefined) { PRODUCTS[existIdx] = product; }
-    else { CODE_MAP[c] = PRODUCTS.length; PRODUCTS.push(product); }
-    if (b) BARCODE_MAP[b] = CODE_MAP[c];
-    LOCAL_PRODUCTS[c] = { b, c, n, o, s, d, stk: prevStk };
-    count++;
+
+    if (hasExistingData && existIdx !== undefined) {
+      // ✅ المنتج موجود مسبقاً: حدّث السعر الأصلي والسعر بعد الخصم فقط
+      // احتفظ بالاسم والباركود ورقم الصنف من البيانات القديمة
+      const prevProduct = PRODUCTS[existIdx];
+      const prevStk = prevProduct[5];
+      const prevName = prevProduct[1]; // الاسم القديم
+      PRODUCTS[existIdx] = [c, prevName, o, s, d, prevStk];
+      // تحديث LOCAL_PRODUCTS بالأسعار الجديدة فقط، مع الحفاظ على الباركود القديم
+      const prevLocal = LOCAL_PRODUCTS[c] || {};
+      const keepBarcode = prevLocal.b || '';
+      LOCAL_PRODUCTS[c] = { ...prevLocal, b: keepBarcode, c, n: prevName, o, s, d, stk: prevStk };
+      countUpdated++;
+    } else if (!hasExistingData || existIdx === undefined) {
+      // ✅ منتج جديد لا يوجد في البيانات السابقة: أضفه كاملاً
+      const prevStk = existIdx !== undefined ? PRODUCTS[existIdx][5] : undefined;
+      const product = [c, n, o, s, d, prevStk];
+      if (existIdx !== undefined) { PRODUCTS[existIdx] = product; }
+      else { CODE_MAP[c] = PRODUCTS.length; PRODUCTS.push(product); }
+      if (b) BARCODE_MAP[b] = CODE_MAP[c];
+      LOCAL_PRODUCTS[c] = { b, c, n, o, s, d, stk: prevStk };
+      countNew++;
+    } else {
+      countSkipped++;
+    }
   });
+
   localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
-  status.innerHTML = `<span style="color:var(--green)">✅ تم تحميل ${count} منتج بنجاح!</span>`;
+
+  let msg = '';
+  if (hasExistingData) {
+    msg = `<span style="color:var(--green)">✅ تم تحديث أسعار ${countUpdated} منتج موجود</span>`;
+    if (countNew > 0) msg += ` — <span style="color:#1a4fa8">➕ ${countNew} منتج جديد أضيف</span>`;
+    if (countSkipped > 0) msg += ` — <span style="color:var(--text3)">${countSkipped} تم تخطيه</span>`;
+  } else {
+    msg = `<span style="color:var(--green)">✅ تم تحميل ${countNew} منتج بنجاح!</span>`;
+  }
+  status.innerHTML = msg;
   closeColMap();
 }
 
@@ -1083,6 +1113,13 @@ function confirmStkMap() {
   }
   errEl.style.display = 'none';
 
+  // ✅ مسح جميع الأرصدة القديمة أولاً قبل تطبيق الملف الجديد
+  PRODUCTS.forEach((p, i) => {
+    PRODUCTS[i][5] = 0;
+    const c = p[0];
+    if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = 0;
+  });
+
   const stockData = {};
   let updated = 0, notFound = 0, skipped = 0;
   // تخطّ الصف الأول (رأس) إذا كان نصياً
@@ -1102,13 +1139,11 @@ function confirmStkMap() {
     } else { notFound++; }
   });
 
+  // تصفير الأرصدة التي لم تأتِ في الملف الجديد
   PRODUCTS.forEach((p, i) => {
-    if (p[5] === undefined || p[5] === null) {
-      PRODUCTS[i][5] = 0;
-      const c = p[0];
+    const c = p[0];
+    if (stockData[c] === undefined) {
       stockData[c] = 0;
-      if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = 0;
-      else LOCAL_PRODUCTS[c] = { c, stk: 0 };
     }
   });
 
