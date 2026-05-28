@@ -403,7 +403,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
   </div>
 </div>
 
-<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
 const _DATA = {"b":{},"c":{},"p":[]};
 let BARCODE_MAP = _DATA.b;
@@ -1193,8 +1193,11 @@ function resetAllData() {
   }, 3000);
 }
 
-// Export — HTML يُفتح في Excel مع ألوان كاملة
+// Export — جدول منسق ملون احترافي
 function exportData() {
+  const headers = ['الباركود','رقم الصنف','اسم الصنف','رصيد الصنف','السعر الأساسي','السعر بعد الخصم','نسبة الخصم'];
+
+  // بناء خريطة عكسية للباركود
   const idx2barcodes = {};
   Object.entries(BARCODE_MAP).forEach(([b, idx]) => {
     if (!idx2barcodes[idx]) idx2barcodes[idx] = [];
@@ -1205,61 +1208,172 @@ function exportData() {
   PRODUCTS.forEach((p, i) => {
     const barcodes = idx2barcodes[i] || [''];
     barcodes.forEach(b => {
+      const orig = parseFloat(p[2]) || 0;
+      const sale = parseFloat(p[3]) || 0;
+      const disc = p[4] !== undefined ? p[4] : (orig > 0 && sale > 0 ? Math.round((orig - sale) / orig * 100) : 0);
       dataRows.push([
-        b,
-        p[0],
-        p[1],
-        p[5] ?? 0,
-        p[2],
-        p[3]
+        b,              // باركود
+        p[0],           // رقم الصنف
+        p[1],           // اسم الصنف
+        p[5] ?? 0,      // رصيد الصنف
+        orig,           // السعر الأساسي
+        sale,           // السعر بعد الخصم
+        disc            // نسبة الخصم
       ]);
     });
   });
 
-  const headers = ['الباركود','رقم الصنف','اسم الصنف','رصيد الصنف','السعر الأساسي','السعر بعد الخصم'];
+  // ===== بناء الشيت =====
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
 
-  const colWidths = ['120px','160px','260px','100px','120px','130px'];
+  // عرض الأعمدة
+  ws['!cols'] = [
+    { wch: 20 }, // باركود
+    { wch: 24 }, // رقم الصنف
+    { wch: 38 }, // اسم الصنف
+    { wch: 14 }, // رصيد الصنف
+    { wch: 16 }, // السعر الأساسي
+    { wch: 18 }, // السعر بعد الخصم
+    { wch: 14 }, // نسبة الخصم
+  ];
 
-  let rowsHtml = '';
-  dataRows.forEach((row, ri) => {
-    const bg = ri % 2 === 0 ? '#E8F5EE' : '#FFFFFF';
-    let cells = '';
-    row.forEach((val, ci) => {
-      let style = `background:${bg};padding:8px 10px;border:1px solid #C5DFC5;font-size:12px;text-align:center;`;
-      if (ci === 3) style += 'color:#1A4FA8;font-weight:700;background:' + (ri%2===0?'#EEF4FF':'#F5F8FF') + ';';
-      else if (ci === 4) style += 'color:#888888;';
-      else if (ci === 5) style += 'color:#1A8A4A;font-weight:700;';
-      cells += `<td style="${style}">${val}</td>`;
-    });
-    rowsHtml += `<tr>${cells}</tr>`;
+  // اتجاه الشيت من اليمين لليسار
+  ws['!sheetView'] = { rightToLeft: true };
+
+  // تجميد الصف الأول
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  // ارتفاع الصفوف
+  const rowHeights = [{ hpt: 26 }]; // رأس الجدول طويل
+  dataRows.forEach(() => rowHeights.push({ hpt: 20 }));
+  ws['!rows'] = rowHeights;
+
+  // ===== تعريف الستايلات =====
+
+  // حدود مشتركة - داكنة للرأس
+  const headerBorder = {
+    top:    { style: 'medium', color: { rgb: '0A3D1F' } },
+    bottom: { style: 'medium', color: { rgb: '0A3D1F' } },
+    left:   { style: 'thin',   color: { rgb: '1A6B3C' } },
+    right:  { style: 'thin',   color: { rgb: '1A6B3C' } },
+  };
+  // حدود خفيفة للبيانات
+  const dataBorderEven = {
+    top:    { style: 'hair', color: { rgb: 'B3DCC0' } },
+    bottom: { style: 'hair', color: { rgb: 'B3DCC0' } },
+    left:   { style: 'thin', color: { rgb: 'C8E6D0' } },
+    right:  { style: 'thin', color: { rgb: 'C8E6D0' } },
+  };
+  const dataBorderOdd = {
+    top:    { style: 'hair', color: { rgb: 'E0EDE0' } },
+    bottom: { style: 'hair', color: { rgb: 'E0EDE0' } },
+    left:   { style: 'thin', color: { rgb: 'DDEBDD' } },
+    right:  { style: 'thin', color: { rgb: 'DDEBDD' } },
+  };
+
+  // رأس الجدول — أخضر داكن مع نص أبيض عريض
+  const headerStyle = {
+    font:      { bold: true, color: { rgb: 'FFFFFF' }, sz: 12, name: 'Arial' },
+    fill:      { patternType: 'solid', fgColor: { rgb: '0F5C2E' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: false, readingOrder: 2 },
+    border:    headerBorder
+  };
+
+  // صف زوجي — أخضر فاتح جداً
+  const baseEven = {
+    font:      { sz: 11, name: 'Arial', color: { rgb: '1A2E1A' } },
+    fill:      { patternType: 'solid', fgColor: { rgb: 'EDF7F1' } },
+    alignment: { horizontal: 'center', vertical: 'center', readingOrder: 2 },
+    border:    dataBorderEven
+  };
+  // صف فردي — أبيض
+  const baseOdd = {
+    font:      { sz: 11, name: 'Arial', color: { rgb: '1A2E1A' } },
+    fill:      { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } },
+    alignment: { horizontal: 'center', vertical: 'center', readingOrder: 2 },
+    border:    dataBorderOdd
+  };
+
+  // اسم المنتج — محاذاة يمين
+  const nameStyleEven = { ...baseEven, alignment: { horizontal: 'right', vertical: 'center', readingOrder: 2 }, font: { sz: 11, name: 'Arial', color: { rgb: '1A2E1A' }, bold: true } };
+  const nameStyleOdd  = { ...baseOdd,  alignment: { horizontal: 'right', vertical: 'center', readingOrder: 2 }, font: { sz: 11, name: 'Arial', color: { rgb: '1A2E1A' }, bold: true } };
+
+  // رصيد — أزرق
+  const stockStyleEven = { ...baseEven, font: { sz: 11, name: 'Arial', bold: true, color: { rgb: '1A4FA8' } }, fill: { patternType: 'solid', fgColor: { rgb: 'DCE9FF' } } };
+  const stockStyleOdd  = { ...baseOdd,  font: { sz: 11, name: 'Arial', bold: true, color: { rgb: '1A4FA8' } }, fill: { patternType: 'solid', fgColor: { rgb: 'EAF1FF' } } };
+
+  // السعر الأصلي — رمادي
+  const origStyleEven = { ...baseEven, font: { sz: 11, name: 'Arial', color: { rgb: '777777' }, italic: true } };
+  const origStyleOdd  = { ...baseOdd,  font: { sz: 11, name: 'Arial', color: { rgb: '777777' }, italic: true } };
+
+  // السعر بعد الخصم — أخضر غامق عريض
+  const saleStyleEven = { ...baseEven, font: { sz: 12, name: 'Arial', bold: true, color: { rgb: '0F6B35' } }, fill: { patternType: 'solid', fgColor: { rgb: 'D6F0E3' } } };
+  const saleStyleOdd  = { ...baseOdd,  font: { sz: 12, name: 'Arial', bold: true, color: { rgb: '0F6B35' } }, fill: { patternType: 'solid', fgColor: { rgb: 'E6F7ED' } } };
+
+  // نسبة الخصم — أحمر للقيم > 0، رمادي للصفر
+  function discStyle(val, isEven) {
+    if (val > 0) {
+      return {
+        ...(isEven ? baseEven : baseOdd),
+        font: { sz: 11, name: 'Arial', bold: true, color: { rgb: 'C0392B' } },
+        fill: { patternType: 'solid', fgColor: { rgb: isEven ? 'FDECEA' : 'FEF3F2' } }
+      };
+    }
+    return isEven ? baseEven : baseOdd;
+  }
+
+  const colLetters = ['A','B','C','D','E','F','G'];
+
+  // ===== تطبيق ستايل رأس الجدول =====
+  colLetters.forEach(col => {
+    const cell = ws[col + '1'];
+    if (cell) cell.s = headerStyle;
   });
 
-  let headerCells = headers.map((h, i) =>
-    `<th style="background:#0F5C2E;color:#FFFFFF;font-weight:700;font-size:13px;padding:10px 12px;border:1px solid #1A8A4A;text-align:center;width:${colWidths[i]};white-space:nowrap;">${h}</th>`
-  ).join('');
+  // ===== تطبيق ستايل صفوف البيانات =====
+  dataRows.forEach((row, ri) => {
+    const rowNum = ri + 2;
+    const isEven = ri % 2 === 0;
+    const discVal = row[6]; // نسبة الخصم
 
-  const html = `
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="UTF-8">
-<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
-<x:Name>المنتجات</x:Name>
-<x:WorksheetOptions><x:FreezePanes/><x:FrozenNoSplit/><x:SplitHorizontal>1</x:SplitHorizontal><x:TopRowBottomPane>1</x:TopRowBottomPane></x:WorksheetOptions>
-</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
-</head>
-<body>
-<table dir="rtl" style="border-collapse:collapse;font-family:Tahoma,Arial,sans-serif;width:100%;">
-  <thead><tr>${headerCells}</tr></thead>
-  <tbody>${rowsHtml}</tbody>
-</table>
-</body></html>`;
+    colLetters.forEach((col, ci) => {
+      const cellRef = col + rowNum;
+      if (!ws[cellRef]) return;
+      let style;
+      switch (ci) {
+        case 2: style = isEven ? nameStyleEven  : nameStyleOdd;  break; // اسم
+        case 3: style = isEven ? stockStyleEven : stockStyleOdd; break; // رصيد
+        case 4: style = isEven ? origStyleEven  : origStyleOdd;  break; // سعر أصلي
+        case 5: style = isEven ? saleStyleEven  : saleStyleOdd;  break; // سعر خصم
+        case 6: style = discStyle(discVal, isEven);               break; // خصم%
+        default: style = isEven ? baseEven : baseOdd;
+      }
+      ws[cellRef].s = style;
 
-  const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'مهرجان_عيد_الاضحى_2026.xls';
-  a.click();
-  URL.revokeObjectURL(url);
+      // تنسيق الأرقام — تأكيد نوع رقمي لإظهار أرقام إنجليزية
+      if (ci === 4 || ci === 5) {
+        ws[cellRef].t = 'n';
+        ws[cellRef].v = parseFloat(ws[cellRef].v) || 0;
+        ws[cellRef].z = '#,##0.00';
+      }
+      if (ci === 3) {
+        ws[cellRef].t = 'n';
+        ws[cellRef].v = parseFloat(ws[cellRef].v) || 0;
+        ws[cellRef].z = '#,##0';
+      }
+      if (ci === 6) {
+        ws[cellRef].t = 'n';
+        if (discVal > 0) { ws[cellRef].v = discVal / 100; ws[cellRef].z = '0%'; }
+        else { ws[cellRef].v = 0; ws[cellRef].z = '0%'; }
+      }
+    });
+  });
+
+  // ===== إنشاء الملف =====
+  const wb = XLSX.utils.book_new();
+  wb.Props = { Title: 'قائمة الأسعار والمخزون', Author: 'Aly Alansary', CreatedDate: new Date() };
+  XLSX.utils.book_append_sheet(wb, ws, 'المنتجات');
+  XLSX.writeFile(wb, 'الأنصاري_الأسعار_والمخزون.xlsx');
 }
 </script>
 </body>
