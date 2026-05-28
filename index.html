@@ -1193,22 +1193,121 @@ function resetAllData() {
   }, 3000);
 }
 
-// Export
+// Export — جدول منسق ملون
 function exportData() {
-  const rows = [['الباركود','رقم الصنف','اسم المنتج','السعر الأصلي','السعر بعد الخصم','نسبة الخصم','الرصيد']];
+  // الأعمدة: باركود | رقم الصنف | اسم الصنف | رصيد الصنف | السعر الأساسي | السعر بعد الخصم
+  const headers = ['الباركود','رقم الصنف','اسم الصنف','رصيد الصنف','السعر الأساسي','السعر بعد الخصم'];
+
   // Build barcode reverse map
   const idx2barcodes = {};
   Object.entries(BARCODE_MAP).forEach(([b, idx]) => {
     if (!idx2barcodes[idx]) idx2barcodes[idx] = [];
     idx2barcodes[idx].push(b);
   });
+
+  const dataRows = [];
   PRODUCTS.forEach((p, i) => {
     const barcodes = idx2barcodes[i] || [''];
     barcodes.forEach(b => {
-      rows.push([b, p[0], p[1], p[2], p[3], p[4]+'%', p[5]??'']);
+      dataRows.push([
+        b,           // باركود
+        p[0],        // رقم الصنف
+        p[1],        // اسم الصنف
+        p[5] ?? 0,   // رصيد الصنف
+        p[2],        // السعر الأساسي
+        p[3]         // السعر بعد الخصم
+      ]);
     });
   });
-  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+
+  // عرض الأعمدة
+  ws['!cols'] = [
+    { wch: 18 }, // باركود
+    { wch: 22 }, // رقم الصنف
+    { wch: 36 }, // اسم الصنف
+    { wch: 14 }, // رصيد الصنف
+    { wch: 16 }, // السعر الأساسي
+    { wch: 18 }, // السعر بعد الخصم
+  ];
+
+  // تجميد الصف الأول
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  // ألوان رؤوس الأعمدة — أخضر داكن + خط أبيض عريض
+  const headerStyle = {
+    font:      { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
+    fill:      { fgColor: { rgb: '0F5C2E' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
+    border: {
+      top:    { style: 'thin', color: { rgb: 'FFFFFF' } },
+      bottom: { style: 'thin', color: { rgb: 'FFFFFF' } },
+      left:   { style: 'thin', color: { rgb: 'FFFFFF' } },
+      right:  { style: 'thin', color: { rgb: 'FFFFFF' } },
+    }
+  };
+
+  // ألوان صفوف البيانات — تناوب أبيض / أخضر فاتح
+  const rowStyleEven = {
+    font:      { sz: 11 },
+    fill:      { fgColor: { rgb: 'E8F5EE' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: {
+      top:    { style: 'hair', color: { rgb: 'B3DCC0' } },
+      bottom: { style: 'hair', color: { rgb: 'B3DCC0' } },
+      left:   { style: 'hair', color: { rgb: 'B3DCC0' } },
+      right:  { style: 'hair', color: { rgb: 'B3DCC0' } },
+    }
+  };
+  const rowStyleOdd = {
+    font:      { sz: 11 },
+    fill:      { fgColor: { rgb: 'FFFFFF' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: {
+      top:    { style: 'hair', color: { rgb: 'DDE8DD' } },
+      bottom: { style: 'hair', color: { rgb: 'DDE8DD' } },
+      left:   { style: 'hair', color: { rgb: 'DDE8DD' } },
+      right:  { style: 'hair', color: { rgb: 'DDE8DD' } },
+    }
+  };
+  // ستايل خاص لعمود الرصيد (أزرق فاتح)
+  const stockStyleEven = { ...rowStyleEven, font: { sz: 11, bold: true, color: { rgb: '1A4FA8' } }, fill: { fgColor: { rgb: 'EEF4FF' } } };
+  const stockStyleOdd  = { ...rowStyleOdd,  font: { sz: 11, bold: true, color: { rgb: '1A4FA8' } }, fill: { fgColor: { rgb: 'F5F8FF' } } };
+  // ستايل السعر الأساسي (رمادي مشطوب لا يمكن تمثيله في xlsx لكن نلوّنه)
+  const origStyleEven = { ...rowStyleEven, font: { sz: 11, color: { rgb: '888888' } } };
+  const origStyleOdd  = { ...rowStyleOdd,  font: { sz: 11, color: { rgb: '888888' } } };
+  // ستايل السعر بعد الخصم (أخضر)
+  const saleStyleEven = { ...rowStyleEven, font: { sz: 11, bold: true, color: { rgb: '1A8A4A' } } };
+  const saleStyleOdd  = { ...rowStyleOdd,  font: { sz: 11, bold: true, color: { rgb: '1A8A4A' } } };
+
+  const colLetters = ['A','B','C','D','E','F'];
+
+  // تطبيق ستايل رؤوس الأعمدة
+  colLetters.forEach(col => {
+    const cell = ws[col + '1'];
+    if (cell) cell.s = headerStyle;
+  });
+
+  // تطبيق ستايل صفوف البيانات
+  dataRows.forEach((_, ri) => {
+    const rowNum = ri + 2; // الصف 1 هو الرأس
+    const isEven = ri % 2 === 0;
+    colLetters.forEach((col, ci) => {
+      const cellRef = col + rowNum;
+      if (!ws[cellRef]) return;
+      let style;
+      if      (ci === 3) style = isEven ? stockStyleEven : stockStyleOdd; // رصيد
+      else if (ci === 4) style = isEven ? origStyleEven  : origStyleOdd;  // سعر أساسي
+      else if (ci === 5) style = isEven ? saleStyleEven  : saleStyleOdd;  // سعر خصم
+      else               style = isEven ? rowStyleEven   : rowStyleOdd;
+      ws[cellRef].s = style;
+    });
+  });
+
+  // ارتفاع الصف الأول
+  ws['!rows'] = [{ hpt: 22 }];
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'المنتجات');
   XLSX.writeFile(wb, 'مهرجان_عيد_الاضحى_2026.xlsx');
