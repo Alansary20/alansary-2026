@@ -46,6 +46,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 /* Scanner */
 .scanner-wrap{background:#000;border-radius:16px;overflow:hidden;margin-bottom:12px;position:relative;min-height:260px;aspect-ratio:4/3}
 #scanner-video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:1;border-radius:inherit}
+/* Scanner overlays removed */
 /* Hide all html5-qrcode injected UI */
 #qr-reader__scan_region img,
 #qr-reader__scan_region svg,
@@ -168,7 +169,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 .col-map-required{color:var(--red);margin-right:2px}
 .col-map-optional{color:var(--text3);font-size:10px;margin-right:2px}
 </style>
-<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -277,13 +278,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 
     <div class="form-card">
       <div class="form-title">📤 رفع ملف Excel الأسعار</div>
-      <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none">
-      <button type="button" id="excel-upload-btn" onclick="document.getElementById('excel-file').click()" style="width:100%;border:2px dashed var(--border);background:#f9fdf9;border-radius:12px;padding:20px;text-align:center;cursor:pointer;font-family:inherit;transition:.2s;display:block">
+      <div class="upload-area" id="excel-upload-area">
         <div class="upload-icon">📊</div>
-        <div id="excel-file-name" class="upload-text">انقر لاختيار ملف Excel الأسعار</div>
+        <div class="upload-text">انقر لرفع ملف Excel الأسعار</div>
         <div class="upload-hint">يدعم .xlsm و .xlsx — ستختار الأعمدة بعد الرفع</div>
-      </button>
-      <button type="button" class="btn btn-green" id="excel-process-btn" onclick="processExcelFile()" style="width:100%;margin-top:10px;display:none">📥 معالجة ورفع الملف</button>
+        <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none">
+      </div>
       <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
     </div>
 
@@ -293,13 +293,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
         يدعم ملف <strong>Dynamics</strong> مباشرةً (عمود الفعلي النهائي تلقائياً)<br>
         أو ملف بسيط: <strong>العمود A</strong> رقم الصنف | <strong>العمود B</strong> الكمية
       </div>
-      <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none">
-      <button type="button" id="stock-upload-btn" onclick="document.getElementById('stock-file').click()" style="width:100%;border:2px dashed var(--border);background:#f9fdf9;border-radius:12px;padding:20px;text-align:center;cursor:pointer;font-family:inherit;transition:.2s;display:block">
+      <div class="upload-area" id="stock-upload-area">
         <div class="upload-icon">📦</div>
-        <div id="stock-file-name" class="upload-text">انقر لاختيار ملف الرصيد</div>
+        <div class="upload-text">انقر لرفع ملف الرصيد</div>
         <div class="upload-hint">يدعم .xlsx و .xls — ستختار الأعمدة بعد الرفع</div>
-      </button>
-      <button type="button" class="btn btn-green" id="stock-process-btn" onclick="processStockFile()" style="width:100%;margin-top:10px;display:none">📥 معالجة ورفع الملف</button>
+        <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none">
+      </div>
       <div id="stock-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
     </div>
 
@@ -410,119 +409,42 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
-// ══════════════════════════════════════════
-//  طبقة IndexedDB — تحل محل localStorage
-// ══════════════════════════════════════════
-const DB_NAME    = 'AlansaryDB';
-const DB_VERSION = 1;
-const STORE_KV   = 'kv'; // مخزن مفتاح/قيمة بسيط
-
-let _db = null;
-
-function openDB() {
-  if (_db) return Promise.resolve(_db);
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = e => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_KV)) {
-        db.createObjectStore(STORE_KV);
-      }
-    };
-    req.onsuccess = e => { _db = e.target.result; resolve(_db); };
-    req.onerror   = e => reject(e.target.error);
-  });
-}
-
-function idbSet(key, value) {
-  return openDB().then(db => new Promise((resolve, reject) => {
-    const tx    = db.transaction(STORE_KV, 'readwrite');
-    const store = tx.objectStore(STORE_KV);
-    const req   = store.put(value, key);
-    req.onsuccess = () => resolve();
-    req.onerror   = e => reject(e.target.error);
-  }));
-}
-
-function idbGet(key) {
-  return openDB().then(db => new Promise((resolve, reject) => {
-    const tx    = db.transaction(STORE_KV, 'readonly');
-    const store = tx.objectStore(STORE_KV);
-    const req   = store.get(key);
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror   = e => reject(e.target.error);
-  }));
-}
-
-function idbRemove(key) {
-  return openDB().then(db => new Promise((resolve, reject) => {
-    const tx    = db.transaction(STORE_KV, 'readwrite');
-    const store = tx.objectStore(STORE_KV);
-    const req   = store.delete(key);
-    req.onsuccess = () => resolve();
-    req.onerror   = e => reject(e.target.error);
-  }));
-}
-// ══════════════════════════════════════════
-
-// ── متغيرات حفظ الملفات المختارة ──
-let _pendingExcelFile = null;
-let _pendingStockFile = null;
-
-function processExcelFile() {
-  if (!_pendingExcelFile) return;
-  handleExcelUpload(_pendingExcelFile);
-}
-function processStockFile() {
-  if (!_pendingStockFile) return;
-  handleStockUpload(_pendingStockFile);
-}
-
-window.addEventListener('DOMContentLoaded', function() {
-  document.getElementById('excel-file').addEventListener('change', function(e) {
-    _pendingExcelFile = e.target.files[0] || null;
-    document.getElementById('excel-file-name').textContent = _pendingExcelFile ? '📄 ' + _pendingExcelFile.name : 'انقر لاختيار ملف Excel الأسعار';
-    document.getElementById('excel-process-btn').style.display = _pendingExcelFile ? 'block' : 'none';
-  });
-  document.getElementById('stock-file').addEventListener('change', function(e) {
-    _pendingStockFile = e.target.files[0] || null;
-    document.getElementById('stock-file-name').textContent = _pendingStockFile ? '📄 ' + _pendingStockFile.name : 'انقر لاختيار ملف الرصيد';
-    document.getElementById('stock-process-btn').style.display = _pendingStockFile ? 'block' : 'none';
-  });
-});
-
 const _DATA = {"b":{},"c":{},"p":[]};
 let BARCODE_MAP = _DATA.b;
 let CODE_MAP = _DATA.c;
 let PRODUCTS = _DATA.p; // [code, name, orig, sale, disc]
 
 // Local overrides (user edits)
-let LOCAL_PRODUCTS = {};
-
+let LOCAL_PRODUCTS = JSON.parse(localStorage.getItem('local_products') || '{}');
 // Merge local into maps
 function mergeLocal() {
   Object.values(LOCAL_PRODUCTS).forEach(p => {
     if (!p.c) return;
     const name = p.n || p.name || '';
     const orig = parseFloat(p.o ?? p.orig ?? 0) || 0;
-    const sale = parseFloat(p.s ?? p.sale ?? orig) || orig;
+    const sale = parseFloat(p.s ?? p.sale ?? orig) || orig; // sale=0 مقبول، fallback للأصلي
     const disc = p.d ?? p.disc ?? (orig > 0 ? Math.round((orig - sale) / orig * 100) : 0);
     const stk  = p.stk !== undefined ? p.stk : undefined;
+    // noPrice = منتج من ملف الرصيد فقط بدون سعر — يُقبل برقم الصنف فقط
     if (!name && !p.noPrice) return;
     if (!orig && !p.noPrice) return;
-    const displayName = name || p.c;
+    const displayName = name || p.c; // إذا لا يوجد اسم استخدم رقم الصنف
     const product = [p.c, displayName, orig, sale, disc, stk];
     const idx = CODE_MAP[p.c];
     if (idx !== undefined) { PRODUCTS[idx] = product; }
     else { CODE_MAP[p.c] = PRODUCTS.length; PRODUCTS.push(product); }
+    // دعم الباركودات المتعددة: p.barcodes = [] أو p.b = string
     const barcodes = Array.isArray(p.barcodes) ? p.barcodes : (p.b ? [p.b] : []);
     barcodes.forEach(b => { if (b) BARCODE_MAP[b] = CODE_MAP[p.c]; });
   });
 }
+mergeLocal();
+applyStoredStock(); // تطبيق الرصيد المحفوظ على جميع المنتجات
 
 // تطبيق الرصيد المحفوظ على كل المنتجات عند التحميل
-function applyStoredStock(stored) {
-  stored = stored || {};
+function applyStoredStock() {
+  const stored = JSON.parse(localStorage.getItem('stock_data') || '{}');
+  // أيضاً اقرأ من LOCAL_PRODUCTS كـ fallback
   PRODUCTS.forEach((p, i) => {
     const c = p[0];
     if (stored[c] !== undefined) {
@@ -531,21 +453,6 @@ function applyStoredStock(stored) {
       PRODUCTS[i][5] = LOCAL_PRODUCTS[c].stk;
     }
   });
-}
-
-// تحميل البيانات من IndexedDB عند بدء التطبيق
-async function loadFromDB() {
-  try {
-    const [lp, sd] = await Promise.all([
-      idbGet('local_products'),
-      idbGet('stock_data')
-    ]);
-    LOCAL_PRODUCTS = lp || {};
-    mergeLocal();
-    applyStoredStock(sd || {});
-  } catch(e) {
-    LOCAL_PRODUCTS = {};
-  }
 }
 
 let searchType = 'barcode';
@@ -680,12 +587,11 @@ function clearResult() {
   document.getElementById('search-input').value = '';
 }
 
-// ====== SCANNER — ZXing/browser — اختيار يدوي للكاميرا + افتراضي camera 3 ======
-let zxingReader  = null;
-let scanning     = false;
-let allCameras   = [];
+// ====== SCANNER — اختيار يدوي للكاميرا + افتراضي camera 3 ======
+let h5scanner   = null;
+let scanning    = false;
+let allCameras  = [];
 let selectedCamId = null;
-let _scanStream   = null; // MediaStream الحالي
 
 // تحميل قائمة الكاميرات عند بدء التطبيق
 async function loadCameraList() {
@@ -693,15 +599,9 @@ async function loadCameraList() {
   sel.innerHTML = '<option value="">⏳ جاري التحميل...</option>';
   try {
     // طلب الإذن أولاً
-    await navigator.mediaDevices.getUserMedia({ video: true })
-      .then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
-
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    allCameras = devices
-      .filter(d => d.kind === 'videoinput')
-      .map(d => ({ id: d.deviceId, label: d.label || `كاميرا` }));
-
-    if (!allCameras.length) {
+    await navigator.mediaDevices.getUserMedia({ video: true }).then(s => s.getTracks().forEach(t => t.stop())).catch(()=>{});
+    allCameras = await Html5Qrcode.getCameras();
+    if (!allCameras || !allCameras.length) {
       sel.innerHTML = '<option value="">❌ لا توجد كاميرات</option>';
       return;
     }
@@ -748,96 +648,80 @@ async function toggleScanner() {
   startScanner();
 }
 
-async function startScanner() {
-  // تنظيف أي جلسة سابقة
-  _stopStream();
-  if (zxingReader) { try { if(zxingReader._stopActive) zxingReader._stopActive(); zxingReader.reset(); } catch(e) {} zxingReader = null; }
-
+function startScanner() {
+  if (h5scanner) { try { h5scanner.clear(); } catch(e) {} h5scanner = null; }
   document.getElementById('qr-reader').innerHTML = '';
+  document.getElementById('scanner-video').style.display = 'none';
   document.getElementById('capture-btn').style.display   = 'none';
   document.getElementById('scanner-container').style.display = 'block';
 
-  const video = document.getElementById('scanner-video');
-  video.style.display = 'block';
-
-  // ① فتح الكاميرا يدوياً عبر getUserMedia
-  const mediaConstraints = {
-    video: selectedCamId
-      ? { deviceId: { exact: selectedCamId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-      : { facingMode: 'environment',          width: { ideal: 1280 }, height: { ideal: 720 } }
-  };
-
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-  } catch(e) {
-    _resetScannerUI();
-    return;
+  function onScanSuccess(decodedText) {
+    onBarcodeFound(decodedText);
+    stopScanner();
   }
-  _scanStream = stream;
-  video.srcObject = stream;
-  video.setAttribute('playsinline', 'true');
-  try { await video.play(); } catch(e) {}
 
-  // ② تحديث الزر بعد أن يعمل الفيديو فعلاً
+  // حساب حجم صندوق المسح بناءً على عرض الشاشة
+  const vw  = Math.min(window.innerWidth, 480);
+  const qbW = Math.round(vw * 0.78);
+  const qbH = Math.round(qbW * 0.42);
+
+  const camId = selectedCamId
+    || (allCameras.length ? allCameras[allCameras.length - 1].id : { facingMode: 'environment' });
+
+  const h5qr = new Html5Qrcode('qr-reader', {
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+  });
+  h5scanner = h5qr;
+
+  h5qr.start(
+    camId,
+    {
+      fps: 15,
+      qrbox: { width: qbW, height: qbH },
+      aspectRatio: 4 / 3,
+      disableFlip: false,
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.QR_CODE
+      ]
+    },
+    onScanSuccess,
+    () => {}
+  ).catch(() => {
+    // fallback: Html5QrcodeScanner
+    h5qr.clear().catch(() => {});
+    h5scanner = new Html5QrcodeScanner('qr-reader', {
+      fps: 15,
+      qrbox: { width: qbW, height: qbH }
+    }, false);
+    h5scanner.render(onScanSuccess);
+  });
+
   scanning = true;
   const btn = document.getElementById('scanner-toggle-btn');
-  btn.innerHTML        = '⏹️ إغلاق الكاميرا';
+  btn.innerHTML = '⏹️ إغلاق الكاميرا';
   btn.style.background = 'var(--red)';
-  btn.disabled         = false;
-
-  // ③ إنشاء ZXing reader
-  const ZB = window.ZXingBrowser;
-  const hints = new Map();
-  hints.set(ZB.DecodeHintType.POSSIBLE_FORMATS, [
-    ZB.BarcodeFormat.EAN_13,
-    ZB.BarcodeFormat.EAN_8,
-    ZB.BarcodeFormat.CODE_128,
-    ZB.BarcodeFormat.CODE_39,
-    ZB.BarcodeFormat.UPC_A,
-    ZB.BarcodeFormat.UPC_E,
-    ZB.BarcodeFormat.QR_CODE,
-  ]);
-  const reader = new ZB.BrowserMultiFormatReader(hints);
-  zxingReader = reader;
-
-  // ④ حلقة مسح مستمرة
-  let active = true;
-  zxingReader._stopActive = () => { active = false; };
-
-  async function scanLoop() {
-    if (!active || !scanning) return;
-    try {
-      const result = await reader.decodeOnce(video);
-      if (result && active) {
-        active = false;
-        onBarcodeFound(result.getText());
-        stopScanner();
-        return;
-      }
-    } catch(e) { /* NotFoundException — استمر */ }
-    if (active && scanning) setTimeout(scanLoop, 80);
-  }
-  scanLoop();
+  btn.disabled = false;
 }
 
-function _stopStream() {
+function stopScanner() {
   try {
-    if (_scanStream) {
-      _scanStream.getTracks().forEach(t => t.stop());
-      _scanStream = null;
-    }
-    // أيضاً أوقف ستريم الفيديو مباشرةً
-    const video = document.getElementById('scanner-video');
-    if (video && video.srcObject) {
-      video.srcObject.getTracks().forEach(t => t.stop());
-      video.srcObject = null;
+    if (h5scanner) {
+      if (typeof h5scanner.stop === 'function') {
+        h5scanner.stop().catch(() => {}).finally(() => { try { h5scanner.clear(); } catch(e) {} });
+      } else {
+        h5scanner.clear();
+      }
+      h5scanner = null;
     }
   } catch(e) {}
-}
-
-function _resetScannerUI() {
-  document.getElementById('scanner-video').style.display     = 'none';
+  scanning = false;
+  document.getElementById('scanner-video').style.display     = '';
   document.getElementById('scanner-container').style.display = 'none';
   document.getElementById('capture-btn').style.display       = 'none';
   document.getElementById('qr-reader').innerHTML             = '';
@@ -847,22 +731,8 @@ function _resetScannerUI() {
   btn.disabled         = false;
 }
 
-function stopScanner() {
-  try {
-    if (zxingReader) {
-      if (typeof zxingReader._stopActive === 'function') zxingReader._stopActive();
-      try { zxingReader.reset(); } catch(e) {}
-      zxingReader = null;
-    }
-  } catch(e) {}
-  _stopStream();
-  scanning = false;
-  _resetScannerUI();
-}
-
-// تحميل البيانات والكاميرات عند بدء الصفحة
-window.addEventListener('DOMContentLoaded', async () => {
-  await loadFromDB();
+// تحميل الكاميرات عند بدء الصفحة (بصمت)
+window.addEventListener('DOMContentLoaded', () => {
   loadCameraList();
 });
 
@@ -1009,7 +879,7 @@ function deleteProductFromModal() {
     PRODUCTS.forEach((p, i) => CODE_MAP[p[0]] = i);
   }
   delete LOCAL_PRODUCTS[currentModalCode];
-  idbSet('local_products', LOCAL_PRODUCTS);
+  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
   document.getElementById('detail-modal').classList.remove('open');
   showSuccess();
 }
@@ -1042,7 +912,7 @@ function saveProduct() {
   if (b) BARCODE_MAP[b] = CODE_MAP[c];
   const stkVal = document.getElementById('f-stock') ? document.getElementById('f-stock').value.trim() : '';
   LOCAL_PRODUCTS[c] = {b, c, n, o, s, d, stk: stkVal !== '' ? Number(stkVal) : undefined};
-  idbSet('local_products', LOCAL_PRODUCTS);
+  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
   clearForm();
   showSuccess();
 }
@@ -1136,7 +1006,8 @@ function parseWorkbook(data, type) {
   throw lastErr || new Error('فشلت قراءة الملف');
 }
 
-async function handleExcelUpload(file) {
+async function handleExcelUpload(event) {
+  const file = event.target.files[0];
   if (!file) return;
   const status = document.getElementById('upload-status');
   status.textContent = '⏳ جاري قراءة الملف...';
@@ -1190,14 +1061,9 @@ async function handleExcelUpload(file) {
       document.getElementById('col-map-modal').classList.add('open');
     }
     status.textContent = '';
-    _pendingExcelFile = null;
-    document.getElementById('excel-process-btn').style.display = 'none';
-    document.getElementById('excel-file-name').textContent = 'انقر لاختيار ملف Excel الأسعار';
-    // ✅ Fix Appmint: clear file input value after processing
     document.getElementById('excel-file').value = '';
   } catch(e) {
     status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
-    document.getElementById('excel-file').value = '';
   }
 }
 
@@ -1207,8 +1073,6 @@ function closeColMap() {
   errEl.style.color = 'var(--red)';
   errEl.style.display = 'none';
   _pendingExcelRows = null;
-  // ✅ Fix: also clear file input when modal cancelled
-  document.getElementById('excel-file').value = '';
 }
 
 function confirmColMap() {
@@ -1295,7 +1159,7 @@ function confirmColMap() {
     };
   });
   LOCAL_PRODUCTS = allToSave;
-  idbSet('local_products', LOCAL_PRODUCTS);
+  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
 
   const total = countNew + countUpdated;
   let msg = `<span style="color:var(--green)">✅ تم تحميل ${total.toLocaleString('ar')} منتج</span>`;
@@ -1303,8 +1167,6 @@ function confirmColMap() {
   if (countSkipped > 0) msg += ` — <span style="color:var(--text3)">${countSkipped.toLocaleString('ar')} تم تخطيه</span>`;
   status.innerHTML = msg;
   closeColMap();
-  // ✅ ensure file input is cleared again
-  document.getElementById('excel-file').value = '';
 }
 
 
@@ -1312,7 +1174,8 @@ function confirmColMap() {
 // ===== Column Mapping — Stock =====
 let _pendingStockRows = null;
 
-async function handleStockUpload(file) {
+async function handleStockUpload(event) {
+  const file = event.target.files[0];
   if (!file) return;
   const status = document.getElementById('stock-status');
   status.textContent = '⏳ جاري قراءة الملف...';
@@ -1352,14 +1215,9 @@ async function handleStockUpload(file) {
       sErrEl.textContent = '✅ تم اكتشاف الأعمدة تلقائياً — يمكنك تعديلها أو الضغط تأكيد مباشرة';
     }
     status.textContent = '';
-    _pendingStockFile = null;
-    document.getElementById('stock-process-btn').style.display = 'none';
-    document.getElementById('stock-file-name').textContent = 'انقر لاختيار ملف الرصيد';
-    // ✅ Fix Appmint: clear stock file input after processing
     document.getElementById('stock-file').value = '';
   } catch(e) {
     status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
-    document.getElementById('stock-file').value = '';
   }
 }
 
@@ -1369,8 +1227,6 @@ function closeStkMap() {
   sErrEl.style.color = 'var(--red)';
   sErrEl.style.display = 'none';
   _pendingStockRows = null;
-  // ✅ clear file input when cancelled
-  document.getElementById('stock-file').value = '';
 }
 
 function confirmStkMap() {
@@ -1452,14 +1308,12 @@ function confirmStkMap() {
     if (!LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c] = { c, n: p[1], o: p[2], s: p[3], d: p[4], barcodes: [] };
     LOCAL_PRODUCTS[c].stk = p[5];
   });
-  idbSet('stock_data', stockData);
-  idbSet('local_products', LOCAL_PRODUCTS);
+  localStorage.setItem('stock_data', JSON.stringify(stockData));
+  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
   const status = document.getElementById('stock-status');
   status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>`
     + (notFound ? ` — <span style="color:#1a4fa8">➕ ${notFound.toLocaleString('ar')} منتج جديد أُضيف من الرصيد</span>` : '');
   closeStkMap();
-  // ✅ clear again
-  document.getElementById('stock-file').value = '';
 }
 
 
@@ -1474,8 +1328,8 @@ function closeResetModal() {
 }
 
 function resetAllData() {
-  idbRemove('local_products');
-  idbRemove('stock_data');
+  localStorage.removeItem('local_products');
+  localStorage.removeItem('stock_data');
   PRODUCTS.length = 0;
   Object.keys(CODE_MAP).forEach(k => delete CODE_MAP[k]);
   Object.keys(BARCODE_MAP).forEach(k => delete BARCODE_MAP[k]);
@@ -1682,6 +1536,12 @@ function exportData() {
   XLSX.utils.book_append_sheet(wb, ws, 'المنتجات');
   XLSX.writeFile(wb, 'الأنصاري_الأسعار_والمخزون.xlsx');
 }
+
+// نفس أسلوب ملف الجرد — سطر 2792
+document.getElementById('excel-upload-area').addEventListener('click', () => document.getElementById('excel-file').click());
+document.getElementById('stock-upload-area').addEventListener('click', () => document.getElementById('stock-file').click());
+document.getElementById('excel-file').addEventListener('change', handleExcelUpload);
+document.getElementById('stock-file').addEventListener('change', handleStockUpload);
 </script>
 </body>
 </html>
