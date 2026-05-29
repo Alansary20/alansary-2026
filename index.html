@@ -168,7 +168,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 .col-map-required{color:var(--red);margin-right:2px}
 .col-map-optional{color:var(--text3);font-size:10px;margin-right:2px}
 </style>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -680,11 +680,12 @@ function clearResult() {
   document.getElementById('search-input').value = '';
 }
 
-// ====== SCANNER — اختيار يدوي للكاميرا + افتراضي camera 3 ======
-let h5scanner   = null;
-let scanning    = false;
-let allCameras  = [];
+// ====== SCANNER — ZXing/browser — اختيار يدوي للكاميرا + افتراضي camera 3 ======
+let zxingReader  = null;
+let scanning     = false;
+let allCameras   = [];
 let selectedCamId = null;
+let _scanStream   = null; // MediaStream الحالي
 
 // تحميل قائمة الكاميرات عند بدء التطبيق
 async function loadCameraList() {
@@ -692,9 +693,15 @@ async function loadCameraList() {
   sel.innerHTML = '<option value="">⏳ جاري التحميل...</option>';
   try {
     // طلب الإذن أولاً
-    await navigator.mediaDevices.getUserMedia({ video: true }).then(s => s.getTracks().forEach(t => t.stop())).catch(()=>{});
-    allCameras = await Html5Qrcode.getCameras();
-    if (!allCameras || !allCameras.length) {
+    await navigator.mediaDevices.getUserMedia({ video: true })
+      .then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    allCameras = devices
+      .filter(d => d.kind === 'videoinput')
+      .map(d => ({ id: d.deviceId, label: d.label || `كاميرا` }));
+
+    if (!allCameras.length) {
       sel.innerHTML = '<option value="">❌ لا توجد كاميرات</option>';
       return;
     }
@@ -741,80 +748,96 @@ async function toggleScanner() {
   startScanner();
 }
 
-function startScanner() {
-  if (h5scanner) { try { h5scanner.clear(); } catch(e) {} h5scanner = null; }
+async function startScanner() {
+  // تنظيف أي جلسة سابقة
+  _stopStream();
+  if (zxingReader) { try { if(zxingReader._stopActive) zxingReader._stopActive(); zxingReader.reset(); } catch(e) {} zxingReader = null; }
+
   document.getElementById('qr-reader').innerHTML = '';
-  document.getElementById('scanner-video').style.display = 'none';
   document.getElementById('capture-btn').style.display   = 'none';
   document.getElementById('scanner-container').style.display = 'block';
 
-  function onScanSuccess(decodedText) {
-    onBarcodeFound(decodedText);
-    stopScanner();
+  const video = document.getElementById('scanner-video');
+  video.style.display = 'block';
+
+  // ① فتح الكاميرا يدوياً عبر getUserMedia
+  const mediaConstraints = {
+    video: selectedCamId
+      ? { deviceId: { exact: selectedCamId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      : { facingMode: 'environment',          width: { ideal: 1280 }, height: { ideal: 720 } }
+  };
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+  } catch(e) {
+    _resetScannerUI();
+    return;
   }
+  _scanStream = stream;
+  video.srcObject = stream;
+  video.setAttribute('playsinline', 'true');
+  try { await video.play(); } catch(e) {}
 
-  // حساب حجم صندوق المسح بناءً على عرض الشاشة
-  const vw  = Math.min(window.innerWidth, 480);
-  const qbW = Math.round(vw * 0.78);
-  const qbH = Math.round(qbW * 0.42);
-
-  const camId = selectedCamId
-    || (allCameras.length ? allCameras[allCameras.length - 1].id : { facingMode: 'environment' });
-
-  const h5qr = new Html5Qrcode('qr-reader', {
-    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-  });
-  h5scanner = h5qr;
-
-  h5qr.start(
-    camId,
-    {
-      fps: 15,
-      qrbox: { width: qbW, height: qbH },
-      aspectRatio: 4 / 3,
-      disableFlip: false,
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.QR_CODE
-      ]
-    },
-    onScanSuccess,
-    () => {}
-  ).catch(() => {
-    // fallback: Html5QrcodeScanner
-    h5qr.clear().catch(() => {});
-    h5scanner = new Html5QrcodeScanner('qr-reader', {
-      fps: 15,
-      qrbox: { width: qbW, height: qbH }
-    }, false);
-    h5scanner.render(onScanSuccess);
-  });
-
+  // ② تحديث الزر بعد أن يعمل الفيديو فعلاً
   scanning = true;
   const btn = document.getElementById('scanner-toggle-btn');
-  btn.innerHTML = '⏹️ إغلاق الكاميرا';
+  btn.innerHTML        = '⏹️ إغلاق الكاميرا';
   btn.style.background = 'var(--red)';
-  btn.disabled = false;
+  btn.disabled         = false;
+
+  // ③ إنشاء ZXing reader
+  const ZB = window.ZXingBrowser;
+  const hints = new Map();
+  hints.set(ZB.DecodeHintType.POSSIBLE_FORMATS, [
+    ZB.BarcodeFormat.EAN_13,
+    ZB.BarcodeFormat.EAN_8,
+    ZB.BarcodeFormat.CODE_128,
+    ZB.BarcodeFormat.CODE_39,
+    ZB.BarcodeFormat.UPC_A,
+    ZB.BarcodeFormat.UPC_E,
+    ZB.BarcodeFormat.QR_CODE,
+  ]);
+  const reader = new ZB.BrowserMultiFormatReader(hints);
+  zxingReader = reader;
+
+  // ④ حلقة مسح مستمرة
+  let active = true;
+  zxingReader._stopActive = () => { active = false; };
+
+  async function scanLoop() {
+    if (!active || !scanning) return;
+    try {
+      const result = await reader.decodeOnce(video);
+      if (result && active) {
+        active = false;
+        onBarcodeFound(result.getText());
+        stopScanner();
+        return;
+      }
+    } catch(e) { /* NotFoundException — استمر */ }
+    if (active && scanning) setTimeout(scanLoop, 80);
+  }
+  scanLoop();
 }
 
-function stopScanner() {
+function _stopStream() {
   try {
-    if (h5scanner) {
-      if (typeof h5scanner.stop === 'function') {
-        h5scanner.stop().catch(() => {}).finally(() => { try { h5scanner.clear(); } catch(e) {} });
-      } else {
-        h5scanner.clear();
-      }
-      h5scanner = null;
+    if (_scanStream) {
+      _scanStream.getTracks().forEach(t => t.stop());
+      _scanStream = null;
+    }
+    // أيضاً أوقف ستريم الفيديو مباشرةً
+    const video = document.getElementById('scanner-video');
+    if (video && video.srcObject) {
+      video.srcObject.getTracks().forEach(t => t.stop());
+      video.srcObject = null;
     }
   } catch(e) {}
-  scanning = false;
-  document.getElementById('scanner-video').style.display     = '';
+}
+
+function _resetScannerUI() {
+  document.getElementById('scanner-video').style.display     = 'none';
   document.getElementById('scanner-container').style.display = 'none';
   document.getElementById('capture-btn').style.display       = 'none';
   document.getElementById('qr-reader').innerHTML             = '';
@@ -822,6 +845,19 @@ function stopScanner() {
   btn.innerHTML        = '📷 تشغيل السكانر';
   btn.style.background = '';
   btn.disabled         = false;
+}
+
+function stopScanner() {
+  try {
+    if (zxingReader) {
+      if (typeof zxingReader._stopActive === 'function') zxingReader._stopActive();
+      try { zxingReader.reset(); } catch(e) {}
+      zxingReader = null;
+    }
+  } catch(e) {}
+  _stopStream();
+  scanning = false;
+  _resetScannerUI();
 }
 
 // تحميل البيانات والكاميرات عند بدء الصفحة
