@@ -278,12 +278,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 
     <div class="form-card">
       <div class="form-title">📤 رفع ملف Excel الأسعار</div>
-      <div class="upload-area" onclick="document.getElementById('excel-file').click()">
+      <div class="upload-area" id="excel-upload-area">
         <div class="upload-icon">📊</div>
         <div class="upload-text">انقر لرفع ملف Excel الأسعار</div>
         <div class="upload-hint">يدعم .xlsm و .xlsx — ستختار الأعمدة بعد الرفع</div>
+        <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none">
       </div>
-      <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none" onchange="handleExcelUpload(event)">
       <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
     </div>
 
@@ -293,12 +293,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
         يدعم ملف <strong>Dynamics</strong> مباشرةً (عمود الفعلي النهائي تلقائياً)<br>
         أو ملف بسيط: <strong>العمود A</strong> رقم الصنف | <strong>العمود B</strong> الكمية
       </div>
-      <div class="upload-area" onclick="document.getElementById('stock-file').click()">
+      <div class="upload-area" id="stock-upload-area">
         <div class="upload-icon">📦</div>
         <div class="upload-text">انقر لرفع ملف الرصيد</div>
         <div class="upload-hint">يدعم .xlsx و .xls — ستختار الأعمدة بعد الرفع</div>
+        <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none">
       </div>
-      <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="handleStockUpload(event)">
       <div id="stock-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
     </div>
 
@@ -1061,15 +1061,7 @@ async function handleExcelUpload(event) {
       document.getElementById('col-map-modal').classList.add('open');
     }
     status.textContent = '';
-    // إعادة إنشاء عنصر الرفع بالكامل لضمان عمل onchange في المرة القادمة (webview)
-    const oldInput = document.getElementById('excel-file');
-    const newInput = document.createElement('input');
-    newInput.type = 'file';
-    newInput.id = 'excel-file';
-    newInput.accept = '.xlsx,.xlsm,.xls,.xlsb';
-    newInput.style.display = 'none';
-    newInput.onchange = handleExcelUpload;
-    oldInput.parentNode.replaceChild(newInput, oldInput);
+    document.getElementById('excel-file').value = '';
   } catch(e) {
     status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
   }
@@ -1223,15 +1215,7 @@ async function handleStockUpload(event) {
       sErrEl.textContent = '✅ تم اكتشاف الأعمدة تلقائياً — يمكنك تعديلها أو الضغط تأكيد مباشرة';
     }
     status.textContent = '';
-    // إعادة إنشاء عنصر الرفع بالكامل لضمان عمل onchange في المرة القادمة (webview)
-    const oldStkInput = document.getElementById('stock-file');
-    const newStkInput = document.createElement('input');
-    newStkInput.type = 'file';
-    newStkInput.id = 'stock-file';
-    newStkInput.accept = '.xlsx,.xlsm,.xls';
-    newStkInput.style.display = 'none';
-    newStkInput.onchange = handleStockUpload;
-    oldStkInput.parentNode.replaceChild(newStkInput, oldStkInput);
+    document.getElementById('stock-file').value = '';
   } catch(e) {
     status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
   }
@@ -1552,6 +1536,12 @@ function exportData() {
   XLSX.utils.book_append_sheet(wb, ws, 'المنتجات');
   XLSX.writeFile(wb, 'الأنصاري_الأسعار_والمخزون.xlsx');
 }
+
+// نفس منطق ملف الجرد — ربط أزرار الرفع بـ addEventListener
+document.getElementById('excel-upload-area').addEventListener('click', () => document.getElementById('excel-file').click());
+document.getElementById('stock-upload-area').addEventListener('click', () => document.getElementById('stock-file').click());
+document.getElementById('excel-file').addEventListener('change', handleExcelUpload);
+document.getElementById('stock-file').addEventListener('change', handleStockUpload);
 </script>
 </body>
 </html>
