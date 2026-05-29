@@ -411,6 +411,61 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
+// ══════════════════════════════════════════
+//  طبقة IndexedDB — تحل محل localStorage
+// ══════════════════════════════════════════
+const DB_NAME    = 'AlansaryDB';
+const DB_VERSION = 1;
+const STORE_KV   = 'kv'; // مخزن مفتاح/قيمة بسيط
+
+let _db = null;
+
+function openDB() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_KV)) {
+        db.createObjectStore(STORE_KV);
+      }
+    };
+    req.onsuccess = e => { _db = e.target.result; resolve(_db); };
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+function idbSet(key, value) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx    = db.transaction(STORE_KV, 'readwrite');
+    const store = tx.objectStore(STORE_KV);
+    const req   = store.put(value, key);
+    req.onsuccess = () => resolve();
+    req.onerror   = e => reject(e.target.error);
+  }));
+}
+
+function idbGet(key) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx    = db.transaction(STORE_KV, 'readonly');
+    const store = tx.objectStore(STORE_KV);
+    const req   = store.get(key);
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  }));
+}
+
+function idbRemove(key) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx    = db.transaction(STORE_KV, 'readwrite');
+    const store = tx.objectStore(STORE_KV);
+    const req   = store.delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror   = e => reject(e.target.error);
+  }));
+}
+// ══════════════════════════════════════════
+
 // ── متغيرات حفظ الملفات المختارة ──
 let _pendingExcelFile = null;
 let _pendingStockFile = null;
@@ -443,36 +498,32 @@ let CODE_MAP = _DATA.c;
 let PRODUCTS = _DATA.p; // [code, name, orig, sale, disc]
 
 // Local overrides (user edits)
-let LOCAL_PRODUCTS = JSON.parse(localStorage.getItem('local_products') || '{}');
+let LOCAL_PRODUCTS = {};
+
 // Merge local into maps
 function mergeLocal() {
   Object.values(LOCAL_PRODUCTS).forEach(p => {
     if (!p.c) return;
     const name = p.n || p.name || '';
     const orig = parseFloat(p.o ?? p.orig ?? 0) || 0;
-    const sale = parseFloat(p.s ?? p.sale ?? orig) || orig; // sale=0 مقبول، fallback للأصلي
+    const sale = parseFloat(p.s ?? p.sale ?? orig) || orig;
     const disc = p.d ?? p.disc ?? (orig > 0 ? Math.round((orig - sale) / orig * 100) : 0);
     const stk  = p.stk !== undefined ? p.stk : undefined;
-    // noPrice = منتج من ملف الرصيد فقط بدون سعر — يُقبل برقم الصنف فقط
     if (!name && !p.noPrice) return;
     if (!orig && !p.noPrice) return;
-    const displayName = name || p.c; // إذا لا يوجد اسم استخدم رقم الصنف
+    const displayName = name || p.c;
     const product = [p.c, displayName, orig, sale, disc, stk];
     const idx = CODE_MAP[p.c];
     if (idx !== undefined) { PRODUCTS[idx] = product; }
     else { CODE_MAP[p.c] = PRODUCTS.length; PRODUCTS.push(product); }
-    // دعم الباركودات المتعددة: p.barcodes = [] أو p.b = string
     const barcodes = Array.isArray(p.barcodes) ? p.barcodes : (p.b ? [p.b] : []);
     barcodes.forEach(b => { if (b) BARCODE_MAP[b] = CODE_MAP[p.c]; });
   });
 }
-mergeLocal();
-applyStoredStock(); // تطبيق الرصيد المحفوظ على جميع المنتجات
 
 // تطبيق الرصيد المحفوظ على كل المنتجات عند التحميل
-function applyStoredStock() {
-  const stored = JSON.parse(localStorage.getItem('stock_data') || '{}');
-  // أيضاً اقرأ من LOCAL_PRODUCTS كـ fallback
+function applyStoredStock(stored) {
+  stored = stored || {};
   PRODUCTS.forEach((p, i) => {
     const c = p[0];
     if (stored[c] !== undefined) {
@@ -481,6 +532,21 @@ function applyStoredStock() {
       PRODUCTS[i][5] = LOCAL_PRODUCTS[c].stk;
     }
   });
+}
+
+// تحميل البيانات من IndexedDB عند بدء التطبيق
+async function loadFromDB() {
+  try {
+    const [lp, sd] = await Promise.all([
+      idbGet('local_products'),
+      idbGet('stock_data')
+    ]);
+    LOCAL_PRODUCTS = lp || {};
+    mergeLocal();
+    applyStoredStock(sd || {});
+  } catch(e) {
+    LOCAL_PRODUCTS = {};
+  }
 }
 
 let searchType = 'barcode';
@@ -759,8 +825,9 @@ function stopScanner() {
   btn.disabled         = false;
 }
 
-// تحميل الكاميرات عند بدء الصفحة (بصمت)
-window.addEventListener('DOMContentLoaded', () => {
+// تحميل البيانات والكاميرات عند بدء الصفحة
+window.addEventListener('DOMContentLoaded', async () => {
+  await loadFromDB();
   loadCameraList();
 });
 
@@ -907,7 +974,7 @@ function deleteProductFromModal() {
     PRODUCTS.forEach((p, i) => CODE_MAP[p[0]] = i);
   }
   delete LOCAL_PRODUCTS[currentModalCode];
-  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+  idbSet('local_products', LOCAL_PRODUCTS);
   document.getElementById('detail-modal').classList.remove('open');
   showSuccess();
 }
@@ -940,7 +1007,7 @@ function saveProduct() {
   if (b) BARCODE_MAP[b] = CODE_MAP[c];
   const stkVal = document.getElementById('f-stock') ? document.getElementById('f-stock').value.trim() : '';
   LOCAL_PRODUCTS[c] = {b, c, n, o, s, d, stk: stkVal !== '' ? Number(stkVal) : undefined};
-  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+  idbSet('local_products', LOCAL_PRODUCTS);
   clearForm();
   showSuccess();
 }
@@ -1188,7 +1255,7 @@ function confirmColMap() {
     };
   });
   LOCAL_PRODUCTS = allToSave;
-  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+  idbSet('local_products', LOCAL_PRODUCTS);
 
   const total = countNew + countUpdated;
   let msg = `<span style="color:var(--green)">✅ تم تحميل ${total.toLocaleString('ar')} منتج</span>`;
@@ -1338,8 +1405,8 @@ function confirmStkMap() {
     if (!LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c] = { c, n: p[1], o: p[2], s: p[3], d: p[4], barcodes: [] };
     LOCAL_PRODUCTS[c].stk = p[5];
   });
-  localStorage.setItem('stock_data', JSON.stringify(stockData));
-  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+  idbSet('stock_data', stockData);
+  idbSet('local_products', LOCAL_PRODUCTS);
   const status = document.getElementById('stock-status');
   status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>`
     + (notFound ? ` — <span style="color:#1a4fa8">➕ ${notFound.toLocaleString('ar')} منتج جديد أُضيف من الرصيد</span>` : '');
@@ -1358,8 +1425,8 @@ function closeResetModal() {
 }
 
 function resetAllData() {
-  localStorage.removeItem('local_products');
-  localStorage.removeItem('stock_data');
+  idbRemove('local_products');
+  idbRemove('stock_data');
   PRODUCTS.length = 0;
   Object.keys(CODE_MAP).forEach(k => delete CODE_MAP[k]);
   Object.keys(BARCODE_MAP).forEach(k => delete BARCODE_MAP[k]);
