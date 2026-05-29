@@ -1061,7 +1061,15 @@ async function handleExcelUpload(event) {
       document.getElementById('col-map-modal').classList.add('open');
     }
     status.textContent = '';
-    event.target.value = '';
+    // إعادة إنشاء عنصر الرفع بالكامل لضمان عمل onchange في المرة القادمة (webview)
+    const oldInput = document.getElementById('excel-file');
+    const newInput = document.createElement('input');
+    newInput.type = 'file';
+    newInput.id = 'excel-file';
+    newInput.accept = '.xlsx,.xlsm,.xls,.xlsb';
+    newInput.style.display = 'none';
+    newInput.onchange = handleExcelUpload;
+    oldInput.parentNode.replaceChild(newInput, oldInput);
   } catch(e) {
     status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
   }
@@ -1215,7 +1223,15 @@ async function handleStockUpload(event) {
       sErrEl.textContent = '✅ تم اكتشاف الأعمدة تلقائياً — يمكنك تعديلها أو الضغط تأكيد مباشرة';
     }
     status.textContent = '';
-    event.target.value = '';
+    // إعادة إنشاء عنصر الرفع بالكامل لضمان عمل onchange في المرة القادمة (webview)
+    const oldStkInput = document.getElementById('stock-file');
+    const newStkInput = document.createElement('input');
+    newStkInput.type = 'file';
+    newStkInput.id = 'stock-file';
+    newStkInput.accept = '.xlsx,.xlsm,.xls';
+    newStkInput.style.display = 'none';
+    newStkInput.onchange = handleStockUpload;
+    oldStkInput.parentNode.replaceChild(newStkInput, oldStkInput);
   } catch(e) {
     status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
   }
