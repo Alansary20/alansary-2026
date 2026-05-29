@@ -46,7 +46,6 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 /* Scanner */
 .scanner-wrap{background:#000;border-radius:16px;overflow:hidden;margin-bottom:12px;position:relative;min-height:260px;aspect-ratio:4/3}
 #scanner-video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:1;border-radius:inherit}
-/* Scanner overlays removed */
 /* Hide all html5-qrcode injected UI */
 #qr-reader__scan_region img,
 #qr-reader__scan_region svg,
@@ -1158,8 +1157,11 @@ async function handleExcelUpload(file) {
     _pendingExcelFile = null;
     document.getElementById('excel-process-btn').style.display = 'none';
     document.getElementById('excel-file-name').textContent = 'انقر لاختيار ملف Excel الأسعار';
+    // ✅ Fix Appmint: clear file input value after processing
+    document.getElementById('excel-file').value = '';
   } catch(e) {
     status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
+    document.getElementById('excel-file').value = '';
   }
 }
 
@@ -1169,6 +1171,8 @@ function closeColMap() {
   errEl.style.color = 'var(--red)';
   errEl.style.display = 'none';
   _pendingExcelRows = null;
+  // ✅ Fix: also clear file input when modal cancelled
+  document.getElementById('excel-file').value = '';
 }
 
 function confirmColMap() {
@@ -1263,6 +1267,8 @@ function confirmColMap() {
   if (countSkipped > 0) msg += ` — <span style="color:var(--text3)">${countSkipped.toLocaleString('ar')} تم تخطيه</span>`;
   status.innerHTML = msg;
   closeColMap();
+  // ✅ ensure file input is cleared again
+  document.getElementById('excel-file').value = '';
 }
 
 
@@ -1313,8 +1319,11 @@ async function handleStockUpload(file) {
     _pendingStockFile = null;
     document.getElementById('stock-process-btn').style.display = 'none';
     document.getElementById('stock-file-name').textContent = 'انقر لاختيار ملف الرصيد';
+    // ✅ Fix Appmint: clear stock file input after processing
+    document.getElementById('stock-file').value = '';
   } catch(e) {
     status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
+    document.getElementById('stock-file').value = '';
   }
 }
 
@@ -1324,6 +1333,8 @@ function closeStkMap() {
   sErrEl.style.color = 'var(--red)';
   sErrEl.style.display = 'none';
   _pendingStockRows = null;
+  // ✅ clear file input when cancelled
+  document.getElementById('stock-file').value = '';
 }
 
 function confirmStkMap() {
@@ -1411,6 +1422,8 @@ function confirmStkMap() {
   status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>`
     + (notFound ? ` — <span style="color:#1a4fa8">➕ ${notFound.toLocaleString('ar')} منتج جديد أُضيف من الرصيد</span>` : '');
   closeStkMap();
+  // ✅ clear again
+  document.getElementById('stock-file').value = '';
 }
 
 
