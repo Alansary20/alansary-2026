@@ -278,12 +278,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 
     <div class="form-card">
       <div class="form-title">📤 رفع ملف Excel الأسعار</div>
-      <div class="upload-area" id="excel-upload-area">
+      <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none">
+      <button type="button" class="upload-area" id="excel-upload-btn" onclick="document.getElementById('excel-file').click()" style="width:100%;border:2px dashed var(--border);background:#f9fdf9;border-radius:12px;padding:20px;text-align:center;cursor:pointer;font-family:inherit;transition:.2s">
         <div class="upload-icon">📊</div>
         <div class="upload-text">انقر لرفع ملف Excel الأسعار</div>
         <div class="upload-hint">يدعم .xlsm و .xlsx — ستختار الأعمدة بعد الرفع</div>
-        <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none">
-      </div>
+      </button>
       <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
     </div>
 
@@ -293,12 +293,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
         يدعم ملف <strong>Dynamics</strong> مباشرةً (عمود الفعلي النهائي تلقائياً)<br>
         أو ملف بسيط: <strong>العمود A</strong> رقم الصنف | <strong>العمود B</strong> الكمية
       </div>
-      <div class="upload-area" id="stock-upload-area">
+      <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none">
+      <button type="button" class="upload-area" id="stock-upload-btn" onclick="document.getElementById('stock-file').click()" style="width:100%;border:2px dashed var(--border);background:#f9fdf9;border-radius:12px;padding:20px;text-align:center;cursor:pointer;font-family:inherit;transition:.2s">
         <div class="upload-icon">📦</div>
         <div class="upload-text">انقر لرفع ملف الرصيد</div>
         <div class="upload-hint">يدعم .xlsx و .xls — ستختار الأعمدة بعد الرفع</div>
-        <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none">
-      </div>
+      </button>
       <div id="stock-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
     </div>
 
@@ -1537,9 +1537,6 @@ function exportData() {
   XLSX.writeFile(wb, 'الأنصاري_الأسعار_والمخزون.xlsx');
 }
 
-// نفس منطق ملف الجرد — ربط أزرار الرفع بـ addEventListener
-document.getElementById('excel-upload-area').addEventListener('click', () => document.getElementById('excel-file').click());
-document.getElementById('stock-upload-area').addEventListener('click', () => document.getElementById('stock-file').click());
 document.getElementById('excel-file').addEventListener('change', handleExcelUpload);
 document.getElementById('stock-file').addEventListener('change', handleStockUpload);
 </script>
