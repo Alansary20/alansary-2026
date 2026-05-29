@@ -364,7 +364,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
       <select class="col-map-select" id="smap-code"></select>
     </div>
     <div class="col-map-row">
-      <span class="col-map-label"><span class="col-map-required">*</span> الكمية / الرصيد</span>
+      <span class="col-map-label">اسم الصنف</span>
+      <select class="col-map-select" id="smap-name"></select>
+    </div>
+    <div class="col-map-row">
+      <span class="col-map-label"><span class="col-map-required">*</span> الرصيد (الفعلي النهائي)</span>
       <select class="col-map-select" id="smap-qty"></select>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -421,9 +425,11 @@ function mergeLocal() {
     const sale = parseFloat(p.s ?? p.sale ?? orig) || orig; // sale=0 مقبول، fallback للأصلي
     const disc = p.d ?? p.disc ?? (orig > 0 ? Math.round((orig - sale) / orig * 100) : 0);
     const stk  = p.stk !== undefined ? p.stk : undefined;
-    // اقبل السجل إذا كان فيه رقم صنف + اسم + سعر أصلي على الأقل
-    if (!name || !orig) return;
-    const product = [p.c, name, orig, sale, disc, stk];
+    // noPrice = منتج من ملف الرصيد فقط بدون سعر — يُقبل برقم الصنف فقط
+    if (!name && !p.noPrice) return;
+    if (!orig && !p.noPrice) return;
+    const displayName = name || p.c; // إذا لا يوجد اسم استخدم رقم الصنف
+    const product = [p.c, displayName, orig, sale, disc, stk];
     const idx = CODE_MAP[p.c];
     if (idx !== undefined) { PRODUCTS[idx] = product; }
     else { CODE_MAP[p.c] = PRODUCTS.length; PRODUCTS.push(product); }
@@ -1017,14 +1023,43 @@ async function handleExcelUpload(event) {
     const maxCols  = Math.min(firstRow.length, 26);
 
     buildPreviewTable(rows, 'col-map-preview-tbl', maxCols);
-    buildColOptions('cmap-barcode', firstRow, 1);
-    buildColOptions('cmap-code',    firstRow, 2);
-    buildColOptions('cmap-name',    firstRow, 4);
-    buildColOptions('cmap-orig',    firstRow, 6);
-    buildColOptions('cmap-sale',    firstRow, 7);
 
-    document.getElementById('col-map-error').style.display = 'none';
-    document.getElementById('col-map-modal').classList.add('open');
+    // ===== اكتشاف ذكي للأعمدة =====
+    function detectCol(keywords, fallback) {
+      const idx = firstRow.findIndex(h =>
+        keywords.some(kw => h.includes(kw))
+      );
+      return idx >= 0 ? idx : fallback;
+    }
+
+    const autoBarcode = detectCol(['باركود','barcode','كود','رمز'], 0);
+    const autoCode    = detectCol(['رقم الصنف','رقم صنف','كود الصنف','item','sku','رقم المنتج'], autoBarcode === 0 ? 1 : 0);
+    const autoName    = detectCol(['اسم الصنف','اسم المنتج','اسم','name','وصف','description'], 2);
+    const autoOrig    = detectCol(['سعر أساسي','السعر الأساسي','سعر قبل','original','list price','سعر البيع'], 3);
+    const autoSale    = detectCol(['سعر بعد الخصم','سعر الخصم','بعد الخصم','sale','discounted','صافي'], autoOrig + 1 < firstRow.length ? autoOrig + 1 : autoOrig);
+
+    buildColOptions('cmap-barcode', firstRow, autoBarcode);
+    buildColOptions('cmap-code',    firstRow, autoCode);
+    buildColOptions('cmap-name',    firstRow, autoName);
+    buildColOptions('cmap-orig',    firstRow, autoOrig);
+    buildColOptions('cmap-sale',    firstRow, autoSale);
+
+    // إذا اكتُشفت كل الأعمدة المطلوبة تلقائياً — تخطّ المودال وارفع مباشرة
+    const allDetected = [autoCode, autoName, autoOrig, autoSale].every(i => i >= 0 && i < firstRow.length);
+    const headersLookValid = firstRow.some(h => h.length > 1); // صف الرأس يحتوي نصاً
+    if (allDetected && headersLookValid) {
+      // أظهر المودال لثانية واحدة فقط للتأكيد البصري ثم ارفع تلقائياً
+      document.getElementById('col-map-error').style.display = 'none';
+      document.getElementById('col-map-modal').classList.add('open');
+      // رسالة تأكيد
+      const errEl = document.getElementById('col-map-error');
+      errEl.style.color = 'var(--green)';
+      errEl.style.display = 'block';
+      errEl.textContent = '✅ تم اكتشاف الأعمدة تلقائياً — يمكنك تعديلها أو الضغط تأكيد مباشرة';
+    } else {
+      document.getElementById('col-map-error').style.display = 'none';
+      document.getElementById('col-map-modal').classList.add('open');
+    }
     status.textContent = '';
     event.target.value = '';
   } catch(e) {
@@ -1034,6 +1069,9 @@ async function handleExcelUpload(event) {
 
 function closeColMap() {
   document.getElementById('col-map-modal').classList.remove('open');
+  const errEl = document.getElementById('col-map-error');
+  errEl.style.color = 'var(--red)';
+  errEl.style.display = 'none';
   _pendingExcelRows = null;
 }
 
@@ -1080,15 +1118,15 @@ function confirmColMap() {
       // المنتج موجود — حدّث الأسعار واحتفظ بالرصيد والاسم القديم
       const prev = PRODUCTS[existIdx];
       const prevStk = prev[5];
-      // استخدم الاسم من الملف الجديد إذا كان موجوداً، وإلا احتفظ بالقديم
       const updatedName = n || prev[1];
       PRODUCTS[existIdx] = [c, updatedName, o, s, d, prevStk];
-      // أضف الباركود الجديد إذا لم يكن مسجلاً
       if (b && BARCODE_MAP[b] === undefined) BARCODE_MAP[b] = existIdx;
       const prevLocal = LOCAL_PRODUCTS[c] || {};
       const prevBarcodes = Array.isArray(prevLocal.barcodes) ? prevLocal.barcodes : (prevLocal.b ? [prevLocal.b] : []);
       if (b && !prevBarcodes.includes(b)) prevBarcodes.push(b);
-      LOCAL_PRODUCTS[c] = { ...prevLocal, c, n: updatedName, o, s, d, stk: prevStk, barcodes: prevBarcodes };
+      // إزالة علامة noPrice عند اكتمال البيانات
+      const { noPrice: _, ...restLocal } = prevLocal;
+      LOCAL_PRODUCTS[c] = { ...restLocal, c, n: updatedName, o, s, d, stk: prevStk, barcodes: prevBarcodes };
       countUpdated++;
     } else {
       // منتج جديد — أضفه كاملاً
@@ -1101,6 +1139,26 @@ function confirmColMap() {
     }
   });
 
+  // حفظ جميع المنتجات في localStorage بعد التحديث
+  // (ليس LOCAL_PRODUCTS فقط — بل كل PRODUCTS لضمان التحديث الكامل)
+  const allToSave = {};
+  PRODUCTS.forEach((p, i) => {
+    const c = p[0];
+    const existing = LOCAL_PRODUCTS[c] || {};
+    // احتفظ بالباركودات القديمة
+    const barcodes = Array.isArray(existing.barcodes) ? existing.barcodes : (existing.b ? [existing.b] : []);
+    allToSave[c] = {
+      c,
+      n: p[1],
+      o: p[2],
+      s: p[3],
+      d: p[4],
+      stk: p[5],
+      barcodes,
+      ...(existing.noPrice && (p[2] === 0) ? { noPrice: true } : {})
+    };
+  });
+  LOCAL_PRODUCTS = allToSave;
   localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
 
   const total = countNew + countUpdated;
@@ -1134,12 +1192,28 @@ async function handleStockUpload(event) {
 
     buildPreviewTable(rows, 'stk-map-preview-tbl', maxCols);
 
-    const dynQtyIdx = firstRow.indexOf('الفعلي النهائي');
-    buildColOptions('smap-code', firstRow, 0);
-    buildColOptions('smap-qty',  firstRow, dynQtyIdx >= 0 ? dynQtyIdx : 1);
+    function detectStkCol(keywords, fallback) {
+      const idx = firstRow.findIndex(h => keywords.some(kw => h.includes(kw)));
+      return idx >= 0 ? idx : fallback;
+    }
 
-    document.getElementById('stk-map-error').style.display = 'none';
+    const sAutoCode = detectStkCol(['رقم الصنف','رقم صنف','كود','sku','item'], 0);
+    const sAutoName = detectStkCol(['اسم الصنف','اسم المنتج','اسم','name','وصف'], sAutoCode === 0 ? 1 : 0);
+    const sAutoQty  = detectStkCol(['فعلي نهائي','الفعلي النهائي','رصيد','كمية','stock','qty','quantity','مخزون'], 2);
+
+    buildColOptions('smap-code', firstRow, sAutoCode);
+    buildColOptions('smap-name', firstRow, sAutoName);
+    buildColOptions('smap-qty',  firstRow, sAutoQty);
+
+    const sAllDetected = [sAutoCode, sAutoQty].every(i => i >= 0 && i < firstRow.length);
+    const sErrEl = document.getElementById('stk-map-error');
+    sErrEl.style.display = 'none';
     document.getElementById('stk-map-modal').classList.add('open');
+    if (sAllDetected && firstRow.some(h => h.length > 1)) {
+      sErrEl.style.color = 'var(--green)';
+      sErrEl.style.display = 'block';
+      sErrEl.textContent = '✅ تم اكتشاف الأعمدة تلقائياً — يمكنك تعديلها أو الضغط تأكيد مباشرة';
+    }
     status.textContent = '';
     event.target.value = '';
   } catch(e) {
@@ -1149,6 +1223,9 @@ async function handleStockUpload(event) {
 
 function closeStkMap() {
   document.getElementById('stk-map-modal').classList.remove('open');
+  const sErrEl = document.getElementById('stk-map-error');
+  sErrEl.style.color = 'var(--red)';
+  sErrEl.style.display = 'none';
   _pendingStockRows = null;
 }
 
@@ -1156,6 +1233,7 @@ function confirmStkMap() {
   const rows = _pendingStockRows;
   if (!rows) return;
   const colCode = parseInt(document.getElementById('smap-code').value);
+  const colName = parseInt(document.getElementById('smap-name').value);
   const colQty  = parseInt(document.getElementById('smap-qty').value);
   const errEl   = document.getElementById('stk-map-error');
   if (isNaN(colCode) || isNaN(colQty)) {
@@ -1163,48 +1241,78 @@ function confirmStkMap() {
   }
   errEl.style.display = 'none';
 
-  // تصفير جميع الأرصدة القديمة أولاً
+  const stockData = {};
+  let updated = 0, notFound = 0, skipped = 0;
+  const startRow = isNaN(Number(rows[0][colQty])) ? 1 : 0;
+
+  // أولاً: اقرأ كل الصفوف الصالحة وابنِ stockData
+  rows.forEach((row, ri) => {
+    if (ri < startRow) return;
+    const c = String(row[colCode] !== undefined && row[colCode] !== null ? row[colCode] : '')
+                .trim().replace(/\.0+$/, '');
+    if (!c) return;
+    const rawQty = row[colQty];
+    if (rawQty === '' || rawQty === null || rawQty === undefined) return;
+    const qty = Number(rawQty);
+    if (isNaN(qty)) return;
+    stockData[c] = qty;
+  });
+
+  // ثانياً: صفّر فقط المنتجات الموجودة في PRODUCTS (وليس الجديدة)
   PRODUCTS.forEach((p, i) => {
     PRODUCTS[i][5] = 0;
     if (LOCAL_PRODUCTS[p[0]]) LOCAL_PRODUCTS[p[0]].stk = 0;
   });
 
-  const stockData = {};
-  let updated = 0, notFound = 0, skipped = 0;
-  const startRow = isNaN(Number(rows[0][colQty])) ? 1 : 0;
-
+  // ثالثاً: طبّق stockData
   rows.forEach((row, ri) => {
     if (ri < startRow) return;
-    // تنظيف رقم الصنف — إزالة .0 أو مسافات
     const c = String(row[colCode] !== undefined && row[colCode] !== null ? row[colCode] : '')
                 .trim().replace(/\.0+$/, '');
     if (!c) { skipped++; return; }
-
-    // الكمية: اقبل الصفر، ارفض فقط القيم غير الرقمية والفارغة تماماً
     const rawQty = row[colQty];
     if (rawQty === '' || rawQty === null || rawQty === undefined) { skipped++; return; }
     const qty = Number(rawQty);
     if (isNaN(qty)) { skipped++; return; }
 
+    const n = (!isNaN(colName) && row[colName] !== undefined)
+              ? String(row[colName]).trim() : '';
+
     stockData[c] = qty;
     const idx = CODE_MAP[c];
     if (idx !== undefined) {
       PRODUCTS[idx][5] = qty;
+      // حدّث الاسم إذا كان مؤقتاً (noPrice) وجاء اسم من الملف
+      if (n && LOCAL_PRODUCTS[c] && LOCAL_PRODUCTS[c].noPrice) {
+        PRODUCTS[idx][1] = n;
+        LOCAL_PRODUCTS[c].n = n;
+      }
       if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = qty;
       else LOCAL_PRODUCTS[c] = { c, stk: qty };
       updated++;
     } else {
-      // حفظ الرصيد حتى لو المنتج غير موجود حالياً (قد يُرفع لاحقاً)
-      LOCAL_PRODUCTS[c] = { c, stk: qty };
+      // منتج غير موجود في الأسعار — أضفه باسمه ورصيده، السعر صفر مؤقتاً
+      const displayName = n || c;
+      const newIdx = PRODUCTS.length;
+      CODE_MAP[c] = newIdx;
+      PRODUCTS.push([c, displayName, 0, 0, 0, qty]);
+      LOCAL_PRODUCTS[c] = { c, n: displayName, o: 0, s: 0, d: 0, stk: qty, barcodes: [], noPrice: true };
+      stockData[c] = qty;
       notFound++;
     }
   });
 
+  // مزامنة LOCAL_PRODUCTS مع PRODUCTS بعد تحديث الرصيد
+  PRODUCTS.forEach(p => {
+    const c = p[0];
+    if (!LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c] = { c, n: p[1], o: p[2], s: p[3], d: p[4], barcodes: [] };
+    LOCAL_PRODUCTS[c].stk = p[5];
+  });
   localStorage.setItem('stock_data', JSON.stringify(stockData));
   localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
   const status = document.getElementById('stock-status');
   status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>`
-    + (notFound ? ` — <span style="color:var(--text3)">${notFound.toLocaleString('ar')} غير موجود في القائمة</span>` : '');
+    + (notFound ? ` — <span style="color:#1a4fa8">➕ ${notFound.toLocaleString('ar')} منتج جديد أُضيف من الرصيد</span>` : '');
   closeStkMap();
 }
 
