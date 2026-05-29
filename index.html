@@ -279,9 +279,9 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
     <div class="form-card">
       <div class="form-title">📤 رفع ملف Excel الأسعار</div>
       <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none">
-      <button type="button" id="excel-upload-btn" onclick="document.getElementById('excel-file').click()" class="upload-area" style="width:100%;border:2px dashed var(--border);background:#f9fdf9;border-radius:12px;padding:20px;text-align:center;cursor:pointer;font-family:inherit;transition:.2s;display:block">
+      <button type="button" id="excel-upload-btn" onclick="document.getElementById('excel-file').click()" style="width:100%;border:2px dashed var(--border);background:#f9fdf9;border-radius:12px;padding:20px;text-align:center;cursor:pointer;font-family:inherit;transition:.2s;display:block">
         <div class="upload-icon">📊</div>
-        <div class="upload-text" id="excel-file-name">انقر لاختيار ملف Excel الأسعار</div>
+        <div id="excel-file-name" class="upload-text">انقر لاختيار ملف Excel الأسعار</div>
         <div class="upload-hint">يدعم .xlsm و .xlsx — ستختار الأعمدة بعد الرفع</div>
       </button>
       <button type="button" class="btn btn-green" id="excel-process-btn" onclick="processExcelFile()" style="width:100%;margin-top:10px;display:none">📥 معالجة ورفع الملف</button>
@@ -295,9 +295,9 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
         أو ملف بسيط: <strong>العمود A</strong> رقم الصنف | <strong>العمود B</strong> الكمية
       </div>
       <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none">
-      <button type="button" id="stock-upload-btn" onclick="document.getElementById('stock-file').click()" class="upload-area" style="width:100%;border:2px dashed var(--border);background:#f9fdf9;border-radius:12px;padding:20px;text-align:center;cursor:pointer;font-family:inherit;transition:.2s;display:block">
+      <button type="button" id="stock-upload-btn" onclick="document.getElementById('stock-file').click()" style="width:100%;border:2px dashed var(--border);background:#f9fdf9;border-radius:12px;padding:20px;text-align:center;cursor:pointer;font-family:inherit;transition:.2s;display:block">
         <div class="upload-icon">📦</div>
-        <div class="upload-text" id="stock-file-name">انقر لاختيار ملف الرصيد</div>
+        <div id="stock-file-name" class="upload-text">انقر لاختيار ملف الرصيد</div>
         <div class="upload-hint">يدعم .xlsx و .xls — ستختار الأعمدة بعد الرفع</div>
       </button>
       <button type="button" class="btn btn-green" id="stock-process-btn" onclick="processStockFile()" style="width:100%;margin-top:10px;display:none">📥 معالجة ورفع الملف</button>
@@ -411,6 +411,32 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
+// ── متغيرات حفظ الملفات المختارة ──
+let _pendingExcelFile = null;
+let _pendingStockFile = null;
+
+function processExcelFile() {
+  if (!_pendingExcelFile) return;
+  handleExcelUpload(_pendingExcelFile);
+}
+function processStockFile() {
+  if (!_pendingStockFile) return;
+  handleStockUpload(_pendingStockFile);
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('excel-file').addEventListener('change', function(e) {
+    _pendingExcelFile = e.target.files[0] || null;
+    document.getElementById('excel-file-name').textContent = _pendingExcelFile ? '📄 ' + _pendingExcelFile.name : 'انقر لاختيار ملف Excel الأسعار';
+    document.getElementById('excel-process-btn').style.display = _pendingExcelFile ? 'block' : 'none';
+  });
+  document.getElementById('stock-file').addEventListener('change', function(e) {
+    _pendingStockFile = e.target.files[0] || null;
+    document.getElementById('stock-file-name').textContent = _pendingStockFile ? '📄 ' + _pendingStockFile.name : 'انقر لاختيار ملف الرصيد';
+    document.getElementById('stock-process-btn').style.display = _pendingStockFile ? 'block' : 'none';
+  });
+});
+
 const _DATA = {"b":{},"c":{},"p":[]};
 let BARCODE_MAP = _DATA.b;
 let CODE_MAP = _DATA.c;
@@ -1008,8 +1034,7 @@ function parseWorkbook(data, type) {
   throw lastErr || new Error('فشلت قراءة الملف');
 }
 
-async function handleExcelUpload(event) {
-  const file = event.target.files[0];
+async function handleExcelUpload(file) {
   if (!file) return;
   const status = document.getElementById('upload-status');
   status.textContent = '⏳ جاري قراءة الملف...';
@@ -1178,8 +1203,7 @@ function confirmColMap() {
 // ===== Column Mapping — Stock =====
 let _pendingStockRows = null;
 
-async function handleStockUpload(event) {
-  const file = event.target.files[0];
+async function handleStockUpload(file) {
   if (!file) return;
   const status = document.getElementById('stock-status');
   status.textContent = '⏳ جاري قراءة الملف...';
@@ -1540,30 +1564,7 @@ function exportData() {
   const wb = XLSX.utils.book_new();
   wb.Props = { Title: 'قائمة الأسعار والمخزون', Author: 'Aly Alansary', CreatedDate: new Date() };
   XLSX.utils.book_append_sheet(wb, ws, 'المنتجات');
-// ===== ربط أزرار الرفع — نفس منطق ملف الجرد =====
-let _pendingExcelFile = null;
-let _pendingStockFile = null;
-
-document.getElementById('excel-file').addEventListener('change', function(e) {
-  _pendingExcelFile = e.target.files[0] || null;
-  document.getElementById('excel-file-name').textContent = _pendingExcelFile ? '📄 ' + _pendingExcelFile.name : 'انقر لاختيار ملف Excel الأسعار';
-  document.getElementById('excel-process-btn').style.display = _pendingExcelFile ? 'block' : 'none';
-});
-
-document.getElementById('stock-file').addEventListener('change', function(e) {
-  _pendingStockFile = e.target.files[0] || null;
-  document.getElementById('stock-file-name').textContent = _pendingStockFile ? '📄 ' + _pendingStockFile.name : 'انقر لاختيار ملف الرصيد';
-  document.getElementById('stock-process-btn').style.display = _pendingStockFile ? 'block' : 'none';
-});
-
-function processExcelFile() {
-  if (!_pendingExcelFile) return;
-  handleExcelUpload({ target: { files: [_pendingExcelFile] } });
-}
-
-function processStockFile() {
-  if (!_pendingStockFile) return;
-  handleStockUpload({ target: { files: [_pendingStockFile] } });
+  XLSX.writeFile(wb, 'الأنصاري_الأسعار_والمخزون.xlsx');
 }
 </script>
 </body>
