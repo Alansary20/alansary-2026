@@ -657,9 +657,20 @@ function startScanner() {
   document.getElementById('capture-btn').style.display   = 'none';
   document.getElementById('scanner-container').style.display = 'block';
 
+  let _lastScanned = '';
+  let _scanCooldown = false;
+
   function onScanSuccess(decodedText) {
+    if (_scanCooldown) return;
+    if (decodedText === _lastScanned) return;
+    _lastScanned = decodedText;
+    _scanCooldown = true;
     onBarcodeFound(decodedText);
-    stopScanner();
+    // انتظر ثانيتين قبل قبول قراءة جديدة
+    setTimeout(() => {
+      _scanCooldown = false;
+      _lastScanned = '';
+    }, 2000);
   }
 
   // حساب حجم صندوق المسح بناءً على عرض الشاشة
@@ -724,22 +735,35 @@ function startScanner() {
   btn.disabled = false;
 }
 
-function stopScanner() {
+async function stopScanner() {
+  scanning = false;
   try {
     if (h5scanner) {
       if (typeof h5scanner.stop === 'function') {
-        h5scanner.stop().catch(() => {}).finally(() => { try { h5scanner.clear(); } catch(e) {} });
-      } else {
-        h5scanner.clear();
+        await h5scanner.stop().catch(() => {});
       }
+      try { h5scanner.clear(); } catch(e) {}
       h5scanner = null;
     }
   } catch(e) {}
-  scanning = false;
+
+  // أوقف كل tracks الكاميرا يدوياً
+  try {
+    const streams = document.querySelectorAll('#qr-reader video, #scanner-container video');
+    streams.forEach(v => {
+      if (v.srcObject) {
+        v.srcObject.getTracks().forEach(t => t.stop());
+        v.srcObject = null;
+      }
+    });
+  } catch(e) {}
+
+  // نظف الـ DOM تماماً
+  document.getElementById('qr-reader').innerHTML = '';
   document.getElementById('scanner-video').style.display     = '';
   document.getElementById('scanner-container').style.display = 'none';
   document.getElementById('capture-btn').style.display       = 'none';
-  document.getElementById('qr-reader').innerHTML             = '';
+
   const btn = document.getElementById('scanner-toggle-btn');
   btn.innerHTML        = '📷 تشغيل السكانر';
   btn.style.background = '';
