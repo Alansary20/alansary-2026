@@ -795,6 +795,12 @@ function onBarcodeFound(code) {
   document.getElementById('search-input').value = code;
   setSearchType('barcode');
   if (typeof doSearch === 'function') doSearch();
+
+  // أغلق الكاميرا إذا وُجد تطابق للمنتج
+  const matched = getProductByBarcode(code);
+  if (matched) {
+    setTimeout(() => stopScanner(), 500);
+  }
 }
 
 // Pages
