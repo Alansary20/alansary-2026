@@ -280,10 +280,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
       <div class="form-title">📤 رفع ملف Excel الأسعار</div>
       <div class="upload-area" id="excel-upload-area">
         <div class="upload-icon">📊</div>
-        <div class="upload-text">انقر لرفع ملف Excel الأسعار</div>
+        <div class="upload-text" id="excel-upload-text">انقر لاختيار ملف Excel الأسعار</div>
         <div class="upload-hint">يدعم .xlsm و .xlsx — ستختار الأعمدة بعد الرفع</div>
-        <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/octet-stream,*/*" style="display:none">
+        <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none">
       </div>
+      <button class="btn btn-green" id="excel-process-btn" onclick="processExcelFile()" style="display:none;width:100%;margin-top:10px">📤 رفع الملف المختار</button>
       <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
     </div>
 
@@ -295,10 +296,11 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
       </div>
       <div class="upload-area" id="stock-upload-area">
         <div class="upload-icon">📦</div>
-        <div class="upload-text">انقر لرفع ملف الرصيد</div>
+        <div class="upload-text" id="stock-upload-text">انقر لاختيار ملف الرصيد</div>
         <div class="upload-hint">يدعم .xlsx و .xls — ستختار الأعمدة بعد الرفع</div>
-        <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/octet-stream,*/*" style="display:none">
+        <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none">
       </div>
+      <button class="btn btn-green" id="stock-process-btn" onclick="processStockFile()" style="display:none;width:100%;margin-top:10px">📤 رفع الملف المختار</button>
       <div id="stock-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
     </div>
 
@@ -668,16 +670,20 @@ function startScanner() {
   const camId = selectedCamId
     || (allCameras.length ? allCameras[allCameras.length - 1].id : { facingMode: 'environment' });
 
+  // صندوق المسح: عرض كامل تقريباً، ارتفاع مناسب للباركود الخطي
+  const scanW = Math.round(vw * 0.85);
+  const scanH = Math.round(scanW * 0.35);
+
   const h5qr = new Html5Qrcode('qr-reader', {
-    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+    experimentalFeatures: { useBarCodeDetectorIfSupported: false }
   });
   h5scanner = h5qr;
 
   h5qr.start(
     camId,
     {
-      fps: 15,
-      qrbox: { width: qbW, height: qbH },
+      fps: 25,
+      qrbox: { width: scanW, height: scanH },
       aspectRatio: 4 / 3,
       disableFlip: false,
       formatsToSupport: [
@@ -693,11 +699,20 @@ function startScanner() {
     onScanSuccess,
     () => {}
   ).catch(() => {
-    // fallback: Html5QrcodeScanner
+    // fallback: Html5QrcodeScanner مع تحديد الصيغ
     h5qr.clear().catch(() => {});
     h5scanner = new Html5QrcodeScanner('qr-reader', {
-      fps: 15,
-      qrbox: { width: qbW, height: qbH }
+      fps: 25,
+      qrbox: { width: scanW, height: scanH },
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.QR_CODE
+      ]
     }, false);
     h5scanner.render(onScanSuccess);
   });
@@ -1006,8 +1021,18 @@ function parseWorkbook(data, type) {
   throw lastErr || new Error('فشلت قراءة الملف');
 }
 
-async function handleExcelUpload(event) {
-  const file = event.target.files[0];
+let _pendingExcelFile = null;
+let _pendingStockFile = null;
+
+function handleExcelUpload(event) {
+  _pendingExcelFile = event.target.files[0];
+  if (!_pendingExcelFile) return;
+  document.getElementById('excel-upload-text').textContent = '✅ ' + _pendingExcelFile.name;
+  document.getElementById('excel-process-btn').style.display = 'block';
+}
+
+async function processExcelFile() {
+  const file = _pendingExcelFile;
   if (!file) return;
   const status = document.getElementById('upload-status');
   status.textContent = '⏳ جاري قراءة الملف...';
@@ -1073,6 +1098,9 @@ function closeColMap() {
   errEl.style.color = 'var(--red)';
   errEl.style.display = 'none';
   _pendingExcelRows = null;
+  _pendingExcelFile = null;
+  document.getElementById('excel-process-btn').style.display = 'none';
+  document.getElementById('excel-upload-text').textContent = 'انقر لاختيار ملف Excel الأسعار';
 }
 
 function confirmColMap() {
@@ -1174,8 +1202,15 @@ function confirmColMap() {
 // ===== Column Mapping — Stock =====
 let _pendingStockRows = null;
 
-async function handleStockUpload(event) {
-  const file = event.target.files[0];
+function handleStockUpload(event) {
+  _pendingStockFile = event.target.files[0];
+  if (!_pendingStockFile) return;
+  document.getElementById('stock-upload-text').textContent = '✅ ' + _pendingStockFile.name;
+  document.getElementById('stock-process-btn').style.display = 'block';
+}
+
+async function processStockFile() {
+  const file = _pendingStockFile;
   if (!file) return;
   const status = document.getElementById('stock-status');
   status.textContent = '⏳ جاري قراءة الملف...';
@@ -1227,6 +1262,9 @@ function closeStkMap() {
   sErrEl.style.color = 'var(--red)';
   sErrEl.style.display = 'none';
   _pendingStockRows = null;
+  _pendingStockFile = null;
+  document.getElementById('stock-process-btn').style.display = 'none';
+  document.getElementById('stock-upload-text').textContent = 'انقر لاختيار ملف الرصيد';
 }
 
 function confirmStkMap() {
@@ -1537,22 +1575,10 @@ function exportData() {
   XLSX.writeFile(wb, 'الأنصاري_الأسعار_والمخزون.xlsx');
 }
 
-// إعادة إنشاء الـ input في كل مرة لضمان عمل رفع الملفات في Android WebView
-document.getElementById('excel-upload-area').addEventListener('click', () => {
-  const old = document.getElementById('excel-file');
-  const newInput = old.cloneNode(true);
-  old.parentNode.replaceChild(newInput, old);
-  newInput.addEventListener('change', handleExcelUpload);
-  newInput.click();
-});
-
-document.getElementById('stock-upload-area').addEventListener('click', () => {
-  const old = document.getElementById('stock-file');
-  const newInput = old.cloneNode(true);
-  old.parentNode.replaceChild(newInput, old);
-  newInput.addEventListener('change', handleStockUpload);
-  newInput.click();
-});
+document.getElementById('excel-upload-area').addEventListener('click', () => document.getElementById('excel-file').click());
+document.getElementById('stock-upload-area').addEventListener('click', () => document.getElementById('stock-file').click());
+document.getElementById('excel-file').addEventListener('change', handleExcelUpload);
+document.getElementById('stock-file').addEventListener('change', handleStockUpload);
 </script>
 </body>
 </html>
