@@ -1537,11 +1537,22 @@ function exportData() {
   XLSX.writeFile(wb, 'الأنصاري_الأسعار_والمخزون.xlsx');
 }
 
-// نفس أسلوب ملف الجرد — سطر 2792
-document.getElementById('excel-upload-area').addEventListener('click', () => document.getElementById('excel-file').click());
-document.getElementById('stock-upload-area').addEventListener('click', () => document.getElementById('stock-file').click());
-document.getElementById('excel-file').addEventListener('change', handleExcelUpload);
-document.getElementById('stock-file').addEventListener('change', handleStockUpload);
+// إعادة إنشاء الـ input في كل مرة لضمان عمل رفع الملفات في Android WebView
+document.getElementById('excel-upload-area').addEventListener('click', () => {
+  const old = document.getElementById('excel-file');
+  const newInput = old.cloneNode(true);
+  old.parentNode.replaceChild(newInput, old);
+  newInput.addEventListener('change', handleExcelUpload);
+  newInput.click();
+});
+
+document.getElementById('stock-upload-area').addEventListener('click', () => {
+  const old = document.getElementById('stock-file');
+  const newInput = old.cloneNode(true);
+  old.parentNode.replaceChild(newInput, old);
+  newInput.addEventListener('change', handleStockUpload);
+  newInput.click();
+});
 </script>
 </body>
 </html>
