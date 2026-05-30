@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>الأنصاري — الأسعار والمخزون</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#1a8a4a;--green-light:#e8f5ee;--green-dark:#0f5c2e;
+  --gold:#c8a227;--gold-light:#fdf6e3;
+  --red:#c0392b;--red-light:#fdecea;
+  --bg:#f7f9f7;--card:#fff;--border:#dde8dd;
+  --text:#1a2e1a;--text2:#4a6a4a;--text3:#8aaa8a;
+}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl}
+#app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+
+/* Header */
+.hdr{background:linear-gradient(135deg,var(--green-dark) 0%,var(--green) 100%);color:#fff;padding:16px;text-align:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,80,0,0.2)}
+.hdr-title{font-size:20px;font-weight:700;letter-spacing:.5px}
+.hdr-sub{font-size:11px;opacity:.8;margin-top:2px}
+.hdr-gold{color:var(--gold);font-weight:700}
+
+/* Nav */
+.nav{display:flex;background:#fff;border-bottom:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+.nav-btn{flex:1;padding:10px 4px;border:none;background:none;font-size:12px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:.2s;font-family:inherit}
+.nav-btn.active{color:var(--green);border-bottom-color:var(--green);font-weight:600}
+.nav-icon{font-size:18px;display:block}
+
+/* Pages */
+.page{display:none;flex:1;flex-direction:column;padding:12px}
+.page.active{display:flex}
+
+/* Search page */
+.scan-area{background:var(--card);border-radius:16px;border:1px solid var(--border);padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,80,0,0.06)}
+.scan-label{font-size:13px;color:var(--text2);margin-bottom:10px;font-weight:600}
+.scan-input-wrap{position:relative}
+.scan-input{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-size:16px;direction:ltr;text-align:right;font-family:inherit;background:#f9fdf9;transition:.2s;outline:none}
+.scan-input:focus{border-color:var(--green);background:#fff}
+.scan-btn{position:absolute;left:10px;top:50%;transform:translateY(-50%);background:var(--green);color:#fff;border:none;border-radius:8px;width:36px;height:36px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.search-tabs{display:flex;gap:6px;margin-bottom:10px}
+.stab{flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:#f9fdf9;font-size:12px;cursor:pointer;font-family:inherit;color:var(--text2);transition:.2s}
+.stab.active{background:var(--green-light);border-color:var(--green);color:var(--green);font-weight:600}
+
+/* Scanner */
+.scanner-wrap{background:#000;border-radius:16px;overflow:hidden;margin-bottom:12px;position:relative;min-height:260px;aspect-ratio:4/3}
+#scanner-video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:1;border-radius:inherit}
+/* Scanner overlays removed */
+/* Scanner يعمل عبر BarcodeDetector API الأصلي */
+/* Camera selector */
+.cam-select-row{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+.cam-select-label{font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;flex-shrink:0}
+.cam-select{flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:inherit;background:#f9fdf9;color:var(--text);outline:none;cursor:pointer}
+.cam-select:focus{border-color:var(--green)}
+.cam-refresh-btn{background:var(--green-light);border:1.5px solid var(--green);border-radius:9px;padding:8px 10px;font-size:16px;cursor:pointer;color:var(--green);flex-shrink:0}
+@keyframes flashGreen{0%{background:rgba(26,138,74,0)}40%{background:rgba(26,138,74,0.5)}100%{background:rgba(26,138,74,0)}}
+.scanner-flash{position:absolute;inset:0;border-radius:14px;pointer-events:none;animation:flashGreen .5s ease-out forwards;z-index:20}
+.scanner-btn-row{display:flex;gap:8px;margin-bottom:12px}
+.btn{padding:10px 16px;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600;transition:.15s;flex:1}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:active{background:var(--green-dark)}
+.btn-outline{background:#fff;color:var(--green);border:2px solid var(--green)}
+.btn-red{background:var(--red);color:#fff}
+.btn-sm{font-size:12px;padding:7px 12px}
+
+/* Result card */
+.result-card{background:var(--card);border-radius:16px;border:1px solid var(--border);padding:16px;box-shadow:0 3px 12px rgba(0,80,0,0.08);animation:fadeIn .3s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.result-badge{display:inline-flex;align-items:center;gap:4px;background:var(--green-light);color:var(--green);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:8px}
+.result-name{font-size:17px;font-weight:700;margin-bottom:4px;color:var(--text)}
+.result-code{font-size:11px;color:var(--text3);margin-bottom:14px;direction:ltr;text-align:right}
+.prices-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.prices-grid.with-stock{grid-template-columns:1fr 1fr 1fr 1fr}
+.price-box{border-radius:12px;padding:10px 8px;text-align:center}
+.price-box.before{background:#f5f5f5}
+.price-box.after{background:var(--green-light);border:1px solid #b3dcc0}
+.price-box.discount{background:var(--red-light);border:1px solid #f5c6c2}
+.price-label{font-size:10px;color:var(--text2);margin-bottom:4px;font-weight:600}
+.price-val{font-size:18px;font-weight:700}
+.price-box.before .price-val{color:#888;text-decoration:line-through;font-size:16px}
+.price-box.after .price-val{color:var(--green)}
+.price-box.discount .price-val{color:var(--red)}
+.unit{font-size:11px;font-weight:400}
+.price-box.stock{background:#eef4ff;border:1px solid #b3c8f0}
+.price-box.stock .price-val{color:#1a4fa8}
+.stock-low{background:#fff8e1;border:1px solid #ffe082}
+.stock-low .price-val{color:#e65100}
+.stock-zero{background:var(--red-light);border:1px solid #f5c6c2}
+.stock-zero .price-val{color:var(--red)}
+
+/* Empty/error states */
+.state-card{background:var(--card);border-radius:14px;border:1px dashed var(--border);padding:28px 16px;text-align:center;color:var(--text3)}
+.state-icon{font-size:36px;margin-bottom:8px}
+.state-text{font-size:13px}
+.error-card{background:var(--red-light);border:1px solid #f5c6c2;border-radius:12px;padding:12px;color:var(--red);font-size:13px;text-align:center;margin-bottom:10px}
+
+/* Products list page */
+.search-bar{display:flex;gap:8px;margin-bottom:10px}
+.list-input{flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#f9fdf9}
+.list-input:focus{border-color:var(--green);background:#fff}
+.product-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.product-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:10px}
+.product-item:active{transform:scale(.99);background:var(--green-light)}
+.pi-info{flex:1;min-width:0}
+.pi-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pi-code{font-size:11px;color:var(--text3);direction:ltr}
+.pi-prices{text-align:left;flex-shrink:0}
+.pi-sale{color:var(--green);font-size:16px;font-weight:700}
+.pi-orig{color:#aaa;font-size:11px;text-decoration:line-through}
+.pi-disc{background:var(--red-light);color:var(--red);border-radius:6px;font-size:10px;font-weight:700;padding:2px 5px;margin-top:2px;display:inline-block}
+.list-count{font-size:11px;color:var(--text3);margin-bottom:8px;text-align:center}
+.load-more{margin:8px auto;display:block;padding:10px 24px}
+
+/* Edit/Add page */
+.form-card{background:var(--card);border-radius:14px;border:1px solid var(--border);padding:16px;margin-bottom:12px}
+.form-title{font-size:14px;font-weight:700;color:var(--green);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.form-row{margin-bottom:12px}
+.form-label{font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:600;display:block}
+.form-input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;font-family:inherit;outline:none;direction:ltr;text-align:right}
+.form-input.rtl{direction:rtl;text-align:right}
+.form-input:focus{border-color:var(--green)}
+.upload-area{border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;cursor:pointer;background:#f9fdf9;transition:.2s}
+.upload-area:hover{border-color:var(--green);background:var(--green-light)}
+.upload-icon{font-size:28px;margin-bottom:6px}
+.upload-text{font-size:12px;color:var(--text2)}
+.upload-hint{font-size:11px;color:var(--text3);margin-top:4px}
+.success-banner{background:#e8f5ee;border:1px solid #b3dcc0;border-radius:10px;padding:10px 14px;color:var(--green);font-size:13px;text-align:center;margin-bottom:10px;display:none}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;justify-content:center;display:none}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:16px;color:var(--green)}
+.modal-close{float:left;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text2)}
+
+/* Spinner */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.result-info-block{background:#f7faf7;border-radius:10px;padding:8px 10px;margin-bottom:14px;display:flex;flex-direction:column;gap:5px}
+.result-info-row{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.result-info-label{color:var(--text2);font-weight:600;flex-shrink:0}
+.result-info-val{color:var(--text);font-weight:500;direction:ltr;text-align:left;font-size:12px;background:#fff;border:1px solid var(--border);border-radius:6px;padding:2px 8px;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.barcode-val{font-family:'Courier New',monospace;font-size:13px;font-weight:700;color:var(--green-dark);letter-spacing:.5px}
+
+/* Column Mapping Modal */
+.col-map-modal{background:#fff;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.col-map-title{font-size:15px;font-weight:700;margin-bottom:6px;color:var(--green)}
+.col-map-subtitle{font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.5}
+.col-map-preview{background:#f7faf7;border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:14px;overflow-x:auto}
+.col-map-preview table{border-collapse:collapse;font-size:11px;width:100%;min-width:300px}
+.col-map-preview th{background:var(--green-light);color:var(--green-dark);padding:4px 8px;text-align:center;border:1px solid #c5dfc5;white-space:nowrap}
+.col-map-preview td{padding:3px 8px;text-align:center;border:1px solid #dde8dd;color:var(--text2);white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis}
+.col-map-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
+.col-map-label{font-size:12px;font-weight:600;color:var(--text2);flex-shrink:0;min-width:120px}
+.col-map-select{flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:inherit;background:#f9fdf9;color:var(--text);outline:none;cursor:pointer}
+.col-map-select:focus{border-color:var(--green)}
+.col-map-required{color:var(--red);margin-right:2px}
+.col-map-optional{color:var(--text3);font-size:10px;margin-right:2px}
+</style>
+
+</head>
+<body>
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-title">الأسعار والمخزون</div>
+    <div class="hdr-sub">by <span class="hdr-gold">Aly Alansary</span></div>
+  </div>
+  <div class="nav">
+    <button class="nav-btn active" onclick="showPage('scan')" id="nav-scan"><span class="nav-icon">📷</span>مسح</button>
+    <button class="nav-btn" onclick="showPage('list')" id="nav-list"><span class="nav-icon">📋</span>المنتجات</button>
+    <button class="nav-btn" onclick="showPage('manage')" id="nav-manage"><span class="nav-icon">⚙️</span>إدارة</button>
+  </div>
+
+  <!-- Scan Page -->
+  <div class="page active" id="page-scan">
+    <div class="scan-area">
+      <div class="scan-label">🔍 البحث عن منتج</div>
+      <div class="search-tabs">
+        <button class="stab active" onclick="setSearchType('barcode')" id="stab-barcode">باركود</button>
+        <button class="stab" onclick="setSearchType('code')" id="stab-code">رقم الصنف</button>
+        <button class="stab" onclick="setSearchType('name')" id="stab-name">اسم المنتج</button>
+      </div>
+      <div class="scan-input-wrap">
+        <input class="scan-input" type="text" id="search-input" placeholder="أدخل الباركود..." inputmode="numeric"
+          oninput="onSearchInput()" onkeydown="if(event.key==='Enter')doSearch()">
+        <button class="scan-btn" onclick="doSearch()">🔎</button>
+      </div>
+    </div>
+    
+    <div class="scanner-wrap" id="scanner-container" style="display:none">
+      <video id="scanner-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;z-index:0;border-radius:inherit"></video>
+    </div>
+    
+    <!-- Camera Selector -->
+    <div class="cam-select-row" id="cam-select-row">
+      <span class="cam-select-label">📷 الكاميرا:</span>
+      <select class="cam-select" id="cam-select" onchange="onCamSelectChange()">
+        <option value="">⏳ جاري التحميل...</option>
+      </select>
+      <button class="cam-refresh-btn" onclick="loadCameraList()" title="تحديث الكاميرات">🔄</button>
+    </div>
+
+    <div class="scanner-btn-row">
+      <button class="btn btn-green" onclick="toggleScanner()" id="scanner-toggle-btn">📷 تشغيل السكانر</button>
+      <button class="btn btn-outline btn-sm" onclick="clearResult()">🗑️ مسح</button>
+    </div>
+    <button class="btn btn-green" id="capture-btn" onclick="captureAndScan()" style="display:none;width:100%;font-size:18px;padding:16px;margin-bottom:12px;background:var(--green-dark)">
+      📸 التقط وامسح
+    </button>
+    
+    <div id="result-area"></div>
+  </div>
+
+  <!-- List Page -->
+  <div class="page" id="page-list">
+    <div class="search-bar">
+      <input class="list-input" type="text" id="list-search" placeholder="🔍 ابحث باسم المنتج أو الصنف..." oninput="filterList()">
+    </div>
+    <div class="list-count" id="list-count"></div>
+    <div class="product-list" id="product-list"></div>
+    <button class="btn btn-outline btn-sm load-more" id="load-more-btn" onclick="loadMore()" style="display:none">تحميل المزيد</button>
+  </div>
+
+  <!-- Manage Page -->
+  <div class="page" id="page-manage">
+    <div class="success-banner" id="success-banner">✅ تمت العملية بنجاح!</div>
+    
+    <div class="form-card">
+      <div class="form-title">➕ إضافة / تعديل منتج</div>
+      <div class="form-row">
+        <label class="form-label">الباركود *</label>
+        <input class="form-input" type="text" id="f-barcode" placeholder="أدخل الباركود" inputmode="numeric">
+      </div>
+      <div class="form-row">
+        <label class="form-label">رقم الصنف *</label>
+        <input class="form-input" type="text" id="f-code" placeholder="مثال: 10111011011100-1006" inputmode="text">
+      </div>
+      <div class="form-row">
+        <label class="form-label">اسم المنتج *</label>
+        <input class="form-input rtl" type="text" id="f-name" placeholder="اسم المنتج بالعربي">
+      </div>
+      <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label class="form-label">السعر الأصلي</label>
+          <input class="form-input" type="number" id="f-orig" placeholder="0" inputmode="decimal" oninput="calcDiscount()">
+        </div>
+        <div>
+          <label class="form-label">السعر بعد الخصم</label>
+          <input class="form-input" type="number" id="f-sale" placeholder="0" inputmode="decimal" oninput="calcDiscount()">
+        </div>
+      </div>
+      <div id="f-discount-preview" style="text-align:center;font-size:13px;color:var(--red);margin-bottom:12px;display:none">
+        نسبة الخصم: <strong id="f-disc-val">0%</strong>
+      </div>
+      <div class="form-row">
+        <label class="form-label">📦 الرصيد (الكمية)</label>
+        <input class="form-input" type="number" id="f-stock" placeholder="0" inputmode="numeric" min="0">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-green" onclick="saveProduct()">💾 حفظ المنتج</button>
+        <button class="btn btn-outline btn-sm" onclick="clearForm()">إعادة تعيين</button>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-title">📤 رفع ملف Excel الأسعار</div>
+      <div class="upload-area" id="excel-upload-area">
+        <div class="upload-icon">📊</div>
+        <div class="upload-text" id="excel-upload-text">انقر لاختيار ملف Excel الأسعار</div>
+        <div class="upload-hint">يدعم .xlsm و .xlsx — ستختار الأعمدة بعد الرفع</div>
+        <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none">
+      </div>
+      <button class="btn btn-green" id="excel-process-btn" onclick="processExcelFile()" style="display:none;width:100%;margin-top:10px">📤 رفع الملف المختار</button>
+      <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-title">📦 رفع ملف رصيد Excel</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.6">
+        يدعم ملف <strong>Dynamics</strong> مباشرةً (عمود الفعلي النهائي تلقائياً)<br>
+        أو ملف بسيط: <strong>العمود A</strong> رقم الصنف | <strong>العمود B</strong> الكمية
+      </div>
+      <div class="upload-area" id="stock-upload-area">
+        <div class="upload-icon">📦</div>
+        <div class="upload-text" id="stock-upload-text">انقر لاختيار ملف الرصيد</div>
+        <div class="upload-hint">يدعم .xlsx و .xls — ستختار الأعمدة بعد الرفع</div>
+        <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none">
+      </div>
+      <button class="btn btn-green" id="stock-process-btn" onclick="processStockFile()" style="display:none;width:100%;margin-top:10px">📤 رفع الملف المختار</button>
+      <div id="stock-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-title">📥 تصدير البيانات</div>
+      <button class="btn btn-green" onclick="exportData()">⬇️ تصدير الكل كـ Excel</button>
+    </div>
+
+    <div class="form-card" style="border-color:#f5c6c2">
+      <div class="form-title" style="color:var(--red)">🗑️ إعادة تعيين شاملة</div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+        يؤدي هذا إلى حذف <strong>جميع البيانات المرفوعة</strong> بما فيها المنتجات والرصيد والتعديلات اليدوية بشكل نهائي ولا يمكن التراجع عنه.
+      </p>
+      <button class="btn btn-red" onclick="confirmReset()">🗑️ مسح كل البيانات</button>
+    </div>
+  </div>
+</div>
+
+<!-- Column Mapping Modal — Products -->
+<div class="modal-overlay" id="col-map-modal" onclick="if(event.target===this)closeColMap()">
+  <div class="col-map-modal">
+    <button class="modal-close" onclick="closeColMap()">✕</button>
+    <div class="col-map-title">📊 تعيين أعمدة ملف المنتجات</div>
+    <div class="col-map-subtitle">اختر العمود المقابل لكل حقل من ملفك. صف المعاينة من الملف الفعلي.</div>
+    <div class="col-map-preview" id="col-map-preview-tbl"></div>
+    <div class="col-map-row">
+      <span class="col-map-label"><span class="col-map-required">*</span> الباركود</span>
+      <select class="col-map-select" id="cmap-barcode"></select>
+    </div>
+    <div class="col-map-row">
+      <span class="col-map-label"><span class="col-map-required">*</span> رقم الصنف</span>
+      <select class="col-map-select" id="cmap-code"></select>
+    </div>
+    <div class="col-map-row">
+      <span class="col-map-label"><span class="col-map-required">*</span> اسم المنتج</span>
+      <select class="col-map-select" id="cmap-name"></select>
+    </div>
+    <div class="col-map-row">
+      <span class="col-map-label"><span class="col-map-required">*</span> السعر الأصلي</span>
+      <select class="col-map-select" id="cmap-orig"></select>
+    </div>
+    <div class="col-map-row">
+      <span class="col-map-label"><span class="col-map-required">*</span> السعر بعد الخصم</span>
+      <select class="col-map-select" id="cmap-sale"></select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-green" onclick="confirmColMap()">✅ تأكيد ورفع</button>
+      <button class="btn btn-outline btn-sm" onclick="closeColMap()">إلغاء</button>
+    </div>
+    <div id="col-map-error" style="margin-top:8px;font-size:12px;color:var(--red);text-align:center;display:none"></div>
+  </div>
+</div>
+
+<!-- Column Mapping Modal — Stock -->
+<div class="modal-overlay" id="stk-map-modal" onclick="if(event.target===this)closeStkMap()">
+  <div class="col-map-modal">
+    <button class="modal-close" onclick="closeStkMap()">✕</button>
+    <div class="col-map-title">📦 تعيين أعمدة ملف الرصيد</div>
+    <div class="col-map-subtitle">اختر العمود المقابل لكل حقل من ملفك. صف المعاينة من الملف الفعلي.</div>
+    <div class="col-map-preview" id="stk-map-preview-tbl"></div>
+    <div class="col-map-row">
+      <span class="col-map-label"><span class="col-map-required">*</span> رقم الصنف</span>
+      <select class="col-map-select" id="smap-code"></select>
+    </div>
+    <div class="col-map-row">
+      <span class="col-map-label">اسم الصنف</span>
+      <select class="col-map-select" id="smap-name"></select>
+    </div>
+    <div class="col-map-row">
+      <span class="col-map-label"><span class="col-map-required">*</span> الرصيد (الفعلي النهائي)</span>
+      <select class="col-map-select" id="smap-qty"></select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-green" onclick="confirmStkMap()">✅ تأكيد ورفع</button>
+      <button class="btn btn-outline btn-sm" onclick="closeStkMap()">إلغاء</button>
+    </div>
+    <div id="stk-map-error" style="margin-top:8px;font-size:12px;color:var(--red);text-align:center;display:none"></div>
+  </div>
+</div>
+
+<!-- Reset Confirmation Modal -->
+<div class="modal-overlay" id="reset-modal" onclick="if(event.target===this)closeResetModal()">
+  <div class="modal" id="reset-modal-content">
+    <div class="modal-title" style="color:var(--red)">⚠️ تأكيد إعادة التعيين</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.7">
+      هل أنت متأكد أنك تريد مسح <strong>جميع البيانات</strong>؟<br>
+      سيتم حذف كل المنتجات والرصيد والتعديلات اليدوية نهائياً ولا يمكن التراجع.
+    </p>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-red" onclick="resetAllData()">✅ نعم، امسح كل شيء</button>
+      <button class="btn btn-outline" onclick="closeResetModal()">❌ إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Detail Modal -->
+<div class="modal-overlay" id="detail-modal" onclick="closeModal(event)">
+  <div class="modal" id="modal-content">
+    <button class="modal-close" onclick="document.getElementById('detail-modal').classList.remove('open')">✕</button>
+    <div class="modal-title" id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-green btn-sm" onclick="editProductFromModal()">✏️ تعديل</button>
+      <button class="btn btn-red btn-sm" onclick="deleteProductFromModal()">🗑️ حذف</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script>
+const _DATA = {"b":{},"c":{},"p":[]};
+let BARCODE_MAP = _DATA.b;
+let CODE_MAP = _DATA.c;
+let PRODUCTS = _DATA.p; // [code, name, orig, sale, disc]
+
+// Local overrides (user edits)
+let LOCAL_PRODUCTS = JSON.parse(localStorage.getItem('local_products') || '{}');
+// Merge local into maps
+function mergeLocal() {
+  Object.values(LOCAL_PRODUCTS).forEach(p => {
+    if (!p.c) return;
+    const name = p.n || p.name || '';
+    const orig = parseFloat(p.o ?? p.orig ?? 0) || 0;
+    const sale = parseFloat(p.s ?? p.sale ?? orig) || orig; // sale=0 مقبول، fallback للأصلي
+    const disc = p.d ?? p.disc ?? (orig > 0 ? Math.round((orig - sale) / orig * 100) : 0);
+    const stk  = p.stk !== undefined ? p.stk : undefined;
+    // noPrice = منتج من ملف الرصيد فقط بدون سعر — يُقبل برقم الصنف فقط
+    if (!name && !p.noPrice) return;
+    if (!orig && !p.noPrice) return;
+    const displayName = name || p.c; // إذا لا يوجد اسم استخدم رقم الصنف
+    const product = [p.c, displayName, orig, sale, disc, stk];
+    const idx = CODE_MAP[p.c];
+    if (idx !== undefined) { PRODUCTS[idx] = product; }
+    else { CODE_MAP[p.c] = PRODUCTS.length; PRODUCTS.push(product); }
+    // دعم الباركودات المتعددة: p.barcodes = [] أو p.b = string
+    const barcodes = Array.isArray(p.barcodes) ? p.barcodes : (p.b ? [p.b] : []);
+    barcodes.forEach(b => { if (b) BARCODE_MAP[b] = CODE_MAP[p.c]; });
+  });
+}
+mergeLocal();
+applyStoredStock(); // تطبيق الرصيد المحفوظ على جميع المنتجات
+
+// تطبيق الرصيد المحفوظ على كل المنتجات عند التحميل
+function applyStoredStock() {
+  const stored = JSON.parse(localStorage.getItem('stock_data') || '{}');
+  // أيضاً اقرأ من LOCAL_PRODUCTS كـ fallback
+  PRODUCTS.forEach((p, i) => {
+    const c = p[0];
+    if (stored[c] !== undefined) {
+      PRODUCTS[i][5] = stored[c];
+    } else if (LOCAL_PRODUCTS[c] && LOCAL_PRODUCTS[c].stk !== undefined) {
+      PRODUCTS[i][5] = LOCAL_PRODUCTS[c].stk;
+    }
+  });
+}
+
+let searchType = 'barcode';
+let listItems = [];
+let listPage = 0;
+const PAGE_SIZE = 30;
+let currentModalCode = null;
+
+// Search type
+function setSearchType(t) {
+  searchType = t;
+  document.querySelectorAll('.stab').forEach(b => b.classList.remove('active'));
+  document.getElementById('stab-'+t).classList.add('active');
+  const input = document.getElementById('search-input');
+  if (t === 'barcode') { input.placeholder = 'أدخل الباركود...'; input.inputMode = 'numeric'; }
+  if (t === 'code') { input.placeholder = 'جزء من رقم الصنف... مثال: 1006'; input.inputMode = 'text'; }
+  if (t === 'name') { input.placeholder = 'ابحث باسم المنتج...'; input.inputMode = 'text'; }
+  document.getElementById('result-area').innerHTML = '';
+}
+
+function getProductByBarcode(b) {
+  const idx = BARCODE_MAP[b];
+  return idx !== undefined ? PRODUCTS[idx] : null;
+}
+
+// Return all barcodes linked to a product code
+function getBarcodesForCode(code) {
+  const idx = CODE_MAP[code];
+  if (idx === undefined) return [];
+  return Object.entries(BARCODE_MAP)
+    .filter(([b, i]) => i === idx)
+    .map(([b]) => b);
+}
+function getProductByCode(c) {
+  const idx = CODE_MAP[c];
+  return idx !== undefined ? PRODUCTS[idx] : null;
+}
+function searchByCode(q) {
+  const ql = q.toLowerCase();
+  return PRODUCTS.filter(p => p[0].toLowerCase().includes(ql)).slice(0, 30);
+}
+function searchByName(q) {
+  const ql = q.toLowerCase();
+  return PRODUCTS.filter(p => p[1].includes(q) || p[1].toLowerCase().includes(ql)).slice(0, 30);
+}
+
+function onSearchInput() {
+  const v = document.getElementById('search-input').value.trim();
+  if (searchType === 'name' && v.length >= 2) { doSearch(); }
+  if (searchType === 'code' && v.length >= 3) { doSearch(); }
+}
+
+function renderResultList(results, emptyMsg) {
+  if (!results.length) return `<div class="error-card">❌ ${emptyMsg}</div>`;
+  if (results.length === 1) return renderProduct(results[0]);
+  return results.map(p => `<div class="product-item" onclick="showDetail(${CODE_MAP[p[0]]})">
+    <div class="pi-info"><div class="pi-name">${p[1]}</div><div class="pi-code">${p[0]}</div></div>
+    <div class="pi-prices">
+      <div class="pi-sale">${p[3]}</div>
+      <div class="pi-orig">${p[2]}</div>
+      <div class="pi-disc">خصم ${p[4]}%</div>
+      ${p[5]!==undefined&&p[5]!==''?`<div class="pi-disc" style="background:#eef4ff;color:#1a4fa8;margin-top:2px">رصيد: ${p[5]}</div>`:''}
+    </div>
+  </div>`).join('');
+}
+
+function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  const area = document.getElementById('result-area');
+  if (searchType === 'barcode') {
+    const p = getProductByBarcode(q);
+    area.innerHTML = p ? renderProduct(p) : `<div class="error-card">❌ لم يُعثر على منتج بهذا الباركود: ${q}</div>`;
+  } else if (searchType === 'code') {
+    // Try exact match first, then partial
+    const exact = getProductByCode(q);
+    if (exact) { area.innerHTML = renderProduct(exact); return; }
+    const results = searchByCode(q);
+    area.innerHTML = renderResultList(results, `لا توجد نتائج لرقم الصنف: "${q}"`);
+    if (results.length > 1) {
+      area.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px;text-align:center">🔎 ${results.length} نتيجة مطابقة</div>` + area.innerHTML;
+    }
+  } else {
+    const results = searchByName(q);
+    area.innerHTML = renderResultList(results, `لا توجد نتائج لـ "${q}"`);
+    if (results.length > 1) {
+      area.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px;text-align:center">🔎 ${results.length} نتيجة مطابقة</div>` + area.innerHTML;
+    }
+  }
+}
+
+function renderProduct(p) {
+  const barcodes = getBarcodesForCode(p[0]);
+  const barcodeHtml = barcodes.length
+    ? barcodes.map(b => `<div class="result-info-row"><span class="result-info-label">📦 الباركود</span><span class="result-info-val barcode-val">${b}</span></div>`).join('')
+    : '';
+  return `<div class="result-card">
+    <div class="result-badge">✅ تم العثور على المنتج</div>
+    <div class="result-name">${p[1]}</div>
+    <div class="result-info-block">
+      <div class="result-info-row"><span class="result-info-label">🔢 رقم الصنف</span><span class="result-info-val">${p[0]}</span></div>
+      ${barcodeHtml}
+    </div>
+    ${renderPricesGrid(p)}
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" onclick="editFromResult('${p[0]}')">✏️ تعديل</button>
+    </div>
+  </div>`;
+}
+
+function renderPricesGrid(p) {
+  const stock = p[5] !== undefined && p[5] !== '' ? Number(p[5]) : null;
+  let stockClass = 'stock', stockLabel = '📦 الرصيد';
+  if (stock !== null) {
+    if (stock === 0)  stockClass = 'stock-zero';
+    else if (stock <= 5) stockClass = 'stock-low';
+  }
+  const stockBox = stock !== null
+    ? `<div class="price-box ${stockClass}"><div class="price-label">${stockLabel}</div><div class="price-val">${stock}<span class="unit"> قطعة</span></div></div>`
+    : '';
+  const gridClass = stock !== null ? 'prices-grid with-stock' : 'prices-grid';
+  return `<div class="${gridClass}">
+    <div class="price-box before"><div class="price-label">السعر الأصلي</div><div class="price-val">${p[2]}<span class="unit"></span></div></div>
+    <div class="price-box after"><div class="price-label">السعر بعد الخصم</div><div class="price-val">${p[3]}<span class="unit"></span></div></div>
+    <div class="price-box discount"><div class="price-label">نسبة الخصم</div><div class="price-val">${p[4]}<span class="unit">%</span></div></div>
+    ${stockBox}
+  </div>`;
+}
+
+function clearResult() {
+  document.getElementById('result-area').innerHTML = '';
+  document.getElementById('search-input').value = '';
+}
+
+// ====== SCANNER — BarcodeDetector API أصلي ======
+let scanning    = false;
+let allCameras  = [];
+let selectedCamId = null;
+let _stream     = null;
+let _animFrame  = null;
+let _detector   = null;
+let _scanCooldown = false;
+
+// تحميل قائمة الكاميرات عند بدء التطبيق
+async function loadCameraList() {
+  const sel = document.getElementById('cam-select');
+  sel.innerHTML = '<option value="">⏳ جاري التحميل...</option>';
+  try {
+    await navigator.mediaDevices.getUserMedia({ video: true })
+      .then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    allCameras = devices
+      .filter(d => d.kind === 'videoinput')
+      .map((d, i) => ({ id: d.deviceId, label: d.label || 'كاميرا ' + i }));
+    if (!allCameras.length) {
+      sel.innerHTML = '<option value="">❌ لا توجد كاميرات</option>';
+      return;
+    }
+    sel.innerHTML = '';
+    allCameras.forEach(cam => {
+      const opt = document.createElement('option');
+      opt.value = cam.id;
+      opt.textContent = cam.label;
+      sel.appendChild(opt);
+    });
+    const cam3 = allCameras.find(c => /camera\s*3/i.test(c.label))
+      || allCameras.find(c => /\b3\b.*back|back.*\b3\b/i.test(c.label))
+      || allCameras[3]
+      || allCameras.find(c => /back|rear/i.test(c.label))
+      || allCameras[allCameras.length - 1];
+    sel.value = cam3.id;
+    selectedCamId = cam3.id;
+  } catch(e) {
+    sel.innerHTML = '<option value="">⚠️ تعذّر الوصول للكاميرات</option>';
+  }
+}
+
+function onCamSelectChange() {
+  const sel = document.getElementById('cam-select');
+  selectedCamId = sel.value;
+  // إذا كان السكانر شغّالاً أعد تشغيله بالكاميرا الجديدة
+  if (scanning) {
+    stopScanner();
+    setTimeout(() => startScanner(), 400);
+  }
+}
+
+async function toggleScanner() {
+  if (scanning) { stopScanner(); return; }
+  const btn = document.getElementById('scanner-toggle-btn');
+  btn.innerHTML = '⏳ جاري التشغيل...';
+  btn.disabled  = true;
+  if (!allCameras.length) await loadCameraList();
+  startScanner();
+}
+
+async function startScanner() {
+  // إيقاف أي جلسة سابقة أولاً
+  await stopScanner();
+
+  const video = document.getElementById('scanner-video');
+  document.getElementById('scanner-container').style.display = 'block';
+  video.style.display = 'block';
+
+  const camId = selectedCamId || (allCameras.length ? allCameras[allCameras.length - 1].id : null);
+  const constraints = camId
+    ? { video: { deviceId: { exact: camId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
+    : { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
+
+  try {
+    _stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = _stream;
+    await video.play();
+  } catch(e) {
+    stopScanner();
+    return;
+  }
+
+  // هيئ BarcodeDetector
+  if ('BarcodeDetector' in window) {
+    _detector = new BarcodeDetector({
+      formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code','data_matrix']
+    });
+  } else {
+    _detector = null;
+  }
+
+  scanning = true;
+  _scanCooldown = false;
+  const btn = document.getElementById('scanner-toggle-btn');
+  btn.innerHTML = '⏹️ إغلاق الكاميرا';
+  btn.style.background = 'var(--red)';
+  btn.disabled = false;
+
+  // حلقة المسح
+  async function scanLoop() {
+    if (!scanning) return;
+    if (_detector && video.readyState === video.HAVE_ENOUGH_DATA) {
+      try {
+        const barcodes = await _detector.detect(video);
+        if (barcodes.length > 0 && !_scanCooldown) {
+          const code = barcodes[0].rawValue;
+          _scanCooldown = true;
+          onBarcodeFound(code);
+          setTimeout(() => { _scanCooldown = false; }, 1500);
+        }
+      } catch(e) {}
+    }
+    _animFrame = requestAnimationFrame(scanLoop);
+  }
+
+  // إذا لا يوجد BarcodeDetector استخدم canvas + ZXing
+  if (!_detector) {
+    startZxingLoop(video);
+  } else {
+    _animFrame = requestAnimationFrame(scanLoop);
+  }
+}
+
+async function stopScanner() {
+  scanning = false;
+  _scanCooldown = false;
+  if (_animFrame) { cancelAnimationFrame(_animFrame); _animFrame = null; }
+  if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
+  const video = document.getElementById('scanner-video');
+  if (video) { video.srcObject = null; video.style.display = 'none'; }
+  document.getElementById('scanner-container').style.display = 'none';
+  const btn = document.getElementById('scanner-toggle-btn');
+  if (btn) { btn.innerHTML = '📷 تشغيل السكانر'; btn.style.background = ''; btn.disabled = false; }
+}
+
+// ZXing fallback للأجهزة التي لا تدعم BarcodeDetector
+let _zxingReader = null;
+function startZxingLoop(video) {
+  if (!window.ZXing) return;
+  const hints = new Map();
+  const formats = [
+    ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+    ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+    ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+    ZXing.BarcodeFormat.QR_CODE
+  ];
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+  _zxingReader = new ZXing.MultiFormatReader();
+  _zxingReader.setHints(hints);
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function zxingLoop() {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      try {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
+        const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+        const result = _zxingReader.decode(bitmap);
+        if (result && !_scanCooldown) {
+          _scanCooldown = true;
+          onBarcodeFound(result.getText());
+          setTimeout(() => { _scanCooldown = false; }, 1500);
+        }
+      } catch(e) {}
+    }
+    _animFrame = requestAnimationFrame(zxingLoop);
+  }
+  _animFrame = requestAnimationFrame(zxingLoop);
+}
+
+// تحميل الكاميرات عند بدء الصفحة (بصمت)
+window.addEventListener('DOMContentLoaded', () => {
+  loadCameraList();
+});
+
+async function captureAndScan() {}
+async function refocusCamera()  {}
+
+// ── صوت البيب عند المسح (بدون مكتبة) ──
+function playBeep() {
+  try {
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type      = 'sine';
+    osc.frequency.setValueAtTime(1800, ctx.currentTime);          // تون عالي واضح
+    gain.gain.setValueAtTime(0.6, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.18);
+    setTimeout(() => ctx.close(), 300);
+  } catch(e) {}
+}
+
+function onBarcodeFound(code) {
+  // صوت + اهتزاز
+  playBeep();
+  if (navigator.vibrate) navigator.vibrate([40, 20, 60]);
+
+  // وميض أخضر
+  const wrap  = document.getElementById('scanner-container');
+  const flash = document.createElement('div');
+  flash.className = 'scanner-flash';
+  wrap.appendChild(flash);
+  setTimeout(() => flash.remove(), 500);
+
+  document.getElementById('search-input').value = code;
+  setSearchType('barcode');
+  if (typeof doSearch === 'function') doSearch();
+
+  // أغلق الكاميرا إذا وُجد تطابق للمنتج
+  const matched = getProductByBarcode(code);
+  if (matched) {
+    setTimeout(() => stopScanner(), 500);
+  }
+}
+
+// Pages
+function showPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.getElementById('nav-'+p).classList.add('active');
+  if (p !== 'scan' && scanning) stopScanner();
+  if (p === 'list') renderList();
+  if (p === 'scan' && !scanning) {}
+}
+
+// Product list
+let filteredList = PRODUCTS;
+function renderList() {
+  filterList();
+}
+
+function filterList() {
+  const q = document.getElementById('list-search').value.trim().toLowerCase();
+  if (!q) { filteredList = PRODUCTS; }
+  else { filteredList = PRODUCTS.filter(p => p[1].includes(q) || p[1].toLowerCase().includes(q) || p[0].toLowerCase().includes(q)); }
+  listPage = 0;
+  document.getElementById('list-count').textContent = `إجمالي: ${filteredList.length.toLocaleString('ar')} منتج`;
+  renderListPage();
+}
+
+function renderListPage() {
+  const start = listPage * PAGE_SIZE;
+  const items = filteredList.slice(start, start + PAGE_SIZE);
+  const list = document.getElementById('product-list');
+  if (listPage === 0) list.innerHTML = '';
+  items.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'product-item';
+    div.innerHTML = `<div class="pi-info"><div class="pi-name">${p[1]}</div><div class="pi-code">${p[0]}</div></div>
+    <div class="pi-prices"><div class="pi-sale">${p[3]}</div><div class="pi-orig">${p[2]}</div><div class="pi-disc">خصم ${p[4]}%</div></div>`;
+    div.onclick = () => showDetail(CODE_MAP[p[0]]);
+    list.appendChild(div);
+  });
+  const more = document.getElementById('load-more-btn');
+  const hasMore = (listPage + 1) * PAGE_SIZE < filteredList.length;
+  more.style.display = hasMore ? 'block' : 'none';
+}
+
+function loadMore() { listPage++; renderListPage(); }
+
+// Detail modal
+function showDetail(idx) {
+  const p = PRODUCTS[idx];
+  if (!p) return;
+  currentModalCode = p[0];
+  document.getElementById('modal-title').textContent = p[1];
+  const barcodes = getBarcodesForCode(p[0]);
+  const barcodeHtml = barcodes.length
+    ? barcodes.map(b => `<div class="result-info-row"><span class="result-info-label">📦 الباركود</span><span class="result-info-val barcode-val">${b}</span></div>`).join('')
+    : '';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="result-info-block" style="margin-bottom:14px">
+      <div class="result-info-row"><span class="result-info-label">🔢 رقم الصنف</span><span class="result-info-val">${p[0]}</span></div>
+      ${barcodeHtml}
+    </div>
+    ${renderPricesGrid(p)}`;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('detail-modal')) document.getElementById('detail-modal').classList.remove('open');
+}
+
+function editProductFromModal() {
+  const idx = CODE_MAP[currentModalCode];
+  const p = PRODUCTS[idx];
+  if (!p) return;
+  document.getElementById('detail-modal').classList.remove('open');
+  showPage('manage');
+  document.getElementById('f-code').value = p[0];
+  document.getElementById('f-name').value = p[1];
+  document.getElementById('f-orig').value = p[2];
+  document.getElementById('f-sale').value = p[3];
+  if (document.getElementById('f-stock')) document.getElementById('f-stock').value = p[5] ?? '';
+  calcDiscount();
+}
+
+function editFromResult(code) {
+  const p = getProductByCode(code);
+  if (!p) return;
+  showPage('manage');
+  document.getElementById('f-code').value = p[0];
+  document.getElementById('f-name').value = p[1];
+  document.getElementById('f-orig').value = p[2];
+  document.getElementById('f-sale').value = p[3];
+  if (document.getElementById('f-stock')) document.getElementById('f-stock').value = p[5] ?? '';
+  calcDiscount();
+}
+
+function deleteProductFromModal() {
+  if (!confirm('هل تريد حذف هذا المنتج؟')) return;
+  const idx = CODE_MAP[currentModalCode];
+  if (idx !== undefined) {
+    PRODUCTS.splice(idx, 1);
+    delete CODE_MAP[currentModalCode];
+    // Rebuild CODE_MAP
+    PRODUCTS.forEach((p, i) => CODE_MAP[p[0]] = i);
+  }
+  delete LOCAL_PRODUCTS[currentModalCode];
+  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+  document.getElementById('detail-modal').classList.remove('open');
+  showSuccess();
+}
+
+// Form
+function calcDiscount() {
+  const o = parseFloat(document.getElementById('f-orig').value);
+  const s = parseFloat(document.getElementById('f-sale').value);
+  const preview = document.getElementById('f-discount-preview');
+  if (o > 0 && s > 0 && s < o) {
+    const d = Math.round((o - s) / o * 100);
+    document.getElementById('f-disc-val').textContent = d + '%';
+    preview.style.display = 'block';
+  } else { preview.style.display = 'none'; }
+}
+
+function saveProduct() {
+  const b = document.getElementById('f-barcode').value.trim();
+  const c = document.getElementById('f-code').value.trim();
+  const n = document.getElementById('f-name').value.trim();
+  const o = parseFloat(document.getElementById('f-orig').value);
+  const s = parseFloat(document.getElementById('f-sale').value);
+  if (!c || !n || isNaN(o) || o <= 0) { alert('يرجى ملء جميع الحقول الإلزامية (الباركود والاسم والسعر الأصلي)'); return; }
+  const d = Math.round((o - s) / o * 100);
+  const stk = document.getElementById('f-stock') ? document.getElementById('f-stock').value.trim() : '';
+  const product = [c, n, o, s, d, stk !== '' ? Number(stk) : undefined];
+  const idx = CODE_MAP[c];
+  if (idx !== undefined) { PRODUCTS[idx] = product; }
+  else { CODE_MAP[c] = PRODUCTS.length; PRODUCTS.push(product); }
+  if (b) BARCODE_MAP[b] = CODE_MAP[c];
+  const stkVal = document.getElementById('f-stock') ? document.getElementById('f-stock').value.trim() : '';
+  LOCAL_PRODUCTS[c] = {b, c, n, o, s, d, stk: stkVal !== '' ? Number(stkVal) : undefined};
+  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+  clearForm();
+  showSuccess();
+}
+
+function clearForm() {
+  ['f-barcode','f-code','f-name','f-orig','f-sale','f-stock'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('f-discount-preview').style.display = 'none';
+}
+
+function showSuccess() {
+  const b = document.getElementById('success-banner');
+  b.style.display = 'block';
+  setTimeout(() => b.style.display = 'none', 3000);
+}
+
+// ===== Column Mapping — Products =====
+let _pendingExcelRows = null;
+
+function buildColOptions(selId, headers, defaultIdx) {
+  const sel = document.getElementById(selId);
+  sel.innerHTML = '';
+  headers.forEach((h, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `عمود ${String.fromCharCode(65+i)} — ${h || '(فارغ)'}`;
+    sel.appendChild(opt);
+  });
+  sel.value = (defaultIdx !== undefined && defaultIdx < headers.length) ? defaultIdx : 0;
+}
+
+function buildPreviewTable(rows, containerId, maxCols) {
+  const preview = rows.slice(0, 4);
+  const cols = maxCols || (preview[0] ? preview[0].length : 0);
+  let html = '<table><tr>';
+  for (let c = 0; c < cols; c++) html += `<th>${String.fromCharCode(65+c)}</th>`;
+  html += '</tr>';
+  preview.forEach(row => {
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) html += `<td>${row[c] !== undefined && row[c] !== '' ? String(row[c]).substring(0,18) : '—'}</td>`;
+    html += '</tr>';
+  });
+  html += '</table>';
+  document.getElementById(containerId).innerHTML = html;
+}
+
+function readFileRobust(file) {
+  function cloneToBlob(f) {
+    return new Promise((res) => {
+      const r = new FileReader();
+      r.onload = e => res(new Blob([e.target.result], { type: 'application/octet-stream' }));
+      r.onerror = () => res(f);
+      r.readAsArrayBuffer(f);
+    });
+  }
+  return cloneToBlob(file).then(blob => new Promise((resolve, reject) => {
+    function tryRead(src, method) {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result);
+      reader.onerror = () => {
+        if (method === 'buffer') tryRead(src, 'binary');
+        else if (method === 'binary') tryRead(src, 'url');
+        else if (src !== file) tryRead(file, 'buffer');
+        else reject(new Error('تعذّر قراءة الملف'));
+      };
+      if (method === 'buffer') reader.readAsArrayBuffer(src);
+      else if (method === 'binary') reader.readAsBinaryString(src);
+      else reader.readAsDataURL(src);
+    }
+    tryRead(blob, 'buffer');
+  })).then(result => {
+    if (result instanceof ArrayBuffer) return { data: new Uint8Array(result), type: 'array' };
+    if (typeof result === 'string' && result.startsWith('data:')) return { data: result.split(',')[1], type: 'base64' };
+    return { data: result, type: 'binary' };
+  });
+}
+
+function parseWorkbook(data, type) {
+  const optionSets = [
+    { cellDates: true,  dense: false, bookVBA: false },
+    { cellDates: false, dense: false, bookVBA: false },
+    { raw: true,        dense: false, bookVBA: false },
+    { raw: true,        dense: false, bookVBA: true  },
+  ];
+  let lastErr;
+  for (const opts of optionSets) {
+    try {
+      const wb = XLSX.read(data, { ...opts, type });
+      if (wb && wb.SheetNames && wb.SheetNames.length) return wb;
+    } catch(e) { lastErr = e; }
+  }
+  throw lastErr || new Error('فشلت قراءة الملف');
+}
+
+let _pendingExcelFile = null;
+let _pendingStockFile = null;
+
+function handleExcelUpload(event) {
+  _pendingExcelFile = event.target.files[0];
+  if (!_pendingExcelFile) return;
+  document.getElementById('excel-upload-text').textContent = '✅ ' + _pendingExcelFile.name;
+  document.getElementById('excel-process-btn').style.display = 'block';
+}
+
+async function processExcelFile() {
+  const file = _pendingExcelFile;
+  if (!file) return;
+  const status = document.getElementById('upload-status');
+  status.textContent = '⏳ جاري قراءة الملف...';
+  try {
+    const { data, type } = await readFileRobust(file);
+    const wb   = parseWorkbook(data, type);
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
+    _pendingExcelRows = rows;
+
+    const firstRow = rows[0].map(h => String(h).trim());
+    const maxCols  = Math.min(firstRow.length, 26);
+
+    buildPreviewTable(rows, 'col-map-preview-tbl', maxCols);
+
+    // ===== اكتشاف ذكي للأعمدة =====
+    function detectCol(keywords, fallback) {
+      const idx = firstRow.findIndex(h =>
+        keywords.some(kw => h.includes(kw))
+      );
+      return idx >= 0 ? idx : fallback;
+    }
+
+    const autoBarcode = detectCol(['باركود','barcode','كود','رمز'], 0);
+    const autoCode    = detectCol(['رقم الصنف','رقم صنف','كود الصنف','item','sku','رقم المنتج'], autoBarcode === 0 ? 1 : 0);
+    const autoName    = detectCol(['اسم الصنف','اسم المنتج','اسم','name','وصف','description'], 2);
+    const autoOrig    = detectCol(['سعر أساسي','السعر الأساسي','سعر قبل','original','list price','سعر البيع'], 3);
+    const autoSale    = detectCol(['سعر بعد الخصم','سعر الخصم','بعد الخصم','sale','discounted','صافي'], autoOrig + 1 < firstRow.length ? autoOrig + 1 : autoOrig);
+
+    buildColOptions('cmap-barcode', firstRow, autoBarcode);
+    buildColOptions('cmap-code',    firstRow, autoCode);
+    buildColOptions('cmap-name',    firstRow, autoName);
+    buildColOptions('cmap-orig',    firstRow, autoOrig);
+    buildColOptions('cmap-sale',    firstRow, autoSale);
+
+    // إذا اكتُشفت كل الأعمدة المطلوبة تلقائياً — تخطّ المودال وارفع مباشرة
+    const allDetected = [autoCode, autoName, autoOrig, autoSale].every(i => i >= 0 && i < firstRow.length);
+    const headersLookValid = firstRow.some(h => h.length > 1); // صف الرأس يحتوي نصاً
+    if (allDetected && headersLookValid) {
+      // أظهر المودال لثانية واحدة فقط للتأكيد البصري ثم ارفع تلقائياً
+      document.getElementById('col-map-error').style.display = 'none';
+      document.getElementById('col-map-modal').classList.add('open');
+      // رسالة تأكيد
+      const errEl = document.getElementById('col-map-error');
+      errEl.style.color = 'var(--green)';
+      errEl.style.display = 'block';
+      errEl.textContent = '✅ تم اكتشاف الأعمدة تلقائياً — يمكنك تعديلها أو الضغط تأكيد مباشرة';
+    } else {
+      document.getElementById('col-map-error').style.display = 'none';
+      document.getElementById('col-map-modal').classList.add('open');
+    }
+    status.textContent = '';
+    document.getElementById('excel-file').value = '';
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
+  }
+}
+
+function closeColMap() {
+  document.getElementById('col-map-modal').classList.remove('open');
+  const errEl = document.getElementById('col-map-error');
+  errEl.style.color = 'var(--red)';
+  errEl.style.display = 'none';
+  _pendingExcelRows = null;
+  _pendingExcelFile = null;
+  document.getElementById('excel-process-btn').style.display = 'none';
+  document.getElementById('excel-upload-text').textContent = 'انقر لاختيار ملف Excel الأسعار';
+}
+
+function confirmColMap() {
+  const rows = _pendingExcelRows;
+  if (!rows) return;
+  const colB = parseInt(document.getElementById('cmap-barcode').value);
+  const colC = parseInt(document.getElementById('cmap-code').value);
+  const colN = parseInt(document.getElementById('cmap-name').value);
+  const colO = parseInt(document.getElementById('cmap-orig').value);
+  const colS = parseInt(document.getElementById('cmap-sale').value);
+
+  const errEl = document.getElementById('col-map-error');
+  if ([colC, colN, colO, colS].some(isNaN)) {
+    errEl.textContent = '⚠️ يرجى اختيار جميع الأعمدة الإلزامية'; errEl.style.display='block'; return;
+  }
+  errEl.style.display = 'none';
+
+  const status = document.getElementById('upload-status');
+  let countNew = 0, countUpdated = 0, countSkipped = 0;
+
+  // تخطّ الصف الأول (رأس) إذا كان نصياً
+  const startRow = isNaN(parseFloat(rows[0][colO])) ? 1 : 0;
+
+  rows.forEach((row, ri) => {
+    if (ri < startRow) return;
+
+    // تنظيف الباركود — يمكن أن يكون فارغاً
+    const b = String(row[colB] !== undefined && row[colB] !== null ? row[colB] : '').trim().replace(/\.0+$/, '');
+    const c = String(row[colC] || '').trim();
+    const n = String(row[colN] || '').trim();
+    const o = parseFloat(row[colO]);
+    // السعر بعد الخصم: إذا كان غائباً أو صفراً استخدم السعر الأصلي
+    const sRaw = parseFloat(row[colS]);
+    const s = (!isNaN(sRaw) && sRaw > 0) ? sRaw : o;
+
+    // تخطّ الصفوف الفاسدة فقط: لازم رقم صنف + اسم + سعر أصلي
+    if (!c || !n || isNaN(o) || o <= 0 || n.length < 2) { countSkipped++; return; }
+
+    const d = Math.round((o - s) / o * 100);
+    const existIdx = CODE_MAP[c];
+
+    if (existIdx !== undefined) {
+      // المنتج موجود — حدّث الأسعار واحتفظ بالرصيد والاسم القديم
+      const prev = PRODUCTS[existIdx];
+      const prevStk = prev[5];
+      const updatedName = n || prev[1];
+      PRODUCTS[existIdx] = [c, updatedName, o, s, d, prevStk];
+      if (b && BARCODE_MAP[b] === undefined) BARCODE_MAP[b] = existIdx;
+      const prevLocal = LOCAL_PRODUCTS[c] || {};
+      const prevBarcodes = Array.isArray(prevLocal.barcodes) ? prevLocal.barcodes : (prevLocal.b ? [prevLocal.b] : []);
+      if (b && !prevBarcodes.includes(b)) prevBarcodes.push(b);
+      // إزالة علامة noPrice عند اكتمال البيانات
+      const { noPrice: _, ...restLocal } = prevLocal;
+      LOCAL_PRODUCTS[c] = { ...restLocal, c, n: updatedName, o, s, d, stk: prevStk, barcodes: prevBarcodes };
+      countUpdated++;
+    } else {
+      // منتج جديد — أضفه كاملاً
+      const idx = PRODUCTS.length;
+      CODE_MAP[c] = idx;
+      PRODUCTS.push([c, n, o, s, d, undefined]);
+      if (b) BARCODE_MAP[b] = idx;
+      LOCAL_PRODUCTS[c] = { c, n, o, s, d, barcodes: b ? [b] : [] };
+      countNew++;
+    }
+  });
+
+  // حفظ جميع المنتجات في localStorage بعد التحديث
+  // (ليس LOCAL_PRODUCTS فقط — بل كل PRODUCTS لضمان التحديث الكامل)
+  const allToSave = {};
+  PRODUCTS.forEach((p, i) => {
+    const c = p[0];
+    const existing = LOCAL_PRODUCTS[c] || {};
+    // احتفظ بالباركودات القديمة
+    const barcodes = Array.isArray(existing.barcodes) ? existing.barcodes : (existing.b ? [existing.b] : []);
+    allToSave[c] = {
+      c,
+      n: p[1],
+      o: p[2],
+      s: p[3],
+      d: p[4],
+      stk: p[5],
+      barcodes,
+      ...(existing.noPrice && (p[2] === 0) ? { noPrice: true } : {})
+    };
+  });
+  LOCAL_PRODUCTS = allToSave;
+  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+
+  const total = countNew + countUpdated;
+  let msg = `<span style="color:var(--green)">✅ تم تحميل ${total.toLocaleString('ar')} منتج</span>`;
+  if (countNew > 0 && countUpdated > 0) msg = `<span style="color:var(--green)">✅ ${countUpdated.toLocaleString('ar')} محدّث — ➕ ${countNew.toLocaleString('ar')} جديد</span>`;
+  if (countSkipped > 0) msg += ` — <span style="color:var(--text3)">${countSkipped.toLocaleString('ar')} تم تخطيه</span>`;
+  status.innerHTML = msg;
+  closeColMap();
+}
+
+
+
+// ===== Column Mapping — Stock =====
+let _pendingStockRows = null;
+
+function handleStockUpload(event) {
+  _pendingStockFile = event.target.files[0];
+  if (!_pendingStockFile) return;
+  document.getElementById('stock-upload-text').textContent = '✅ ' + _pendingStockFile.name;
+  document.getElementById('stock-process-btn').style.display = 'block';
+}
+
+async function processStockFile() {
+  const file = _pendingStockFile;
+  if (!file) return;
+  const status = document.getElementById('stock-status');
+  status.textContent = '⏳ جاري قراءة الملف...';
+  try {
+    const { data, type } = await readFileRobust(file);
+    const wb   = parseWorkbook(data, type);
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
+    _pendingStockRows = rows;
+
+    const firstRow = rows[0].map(h => String(h).trim());
+    const maxCols  = Math.min(firstRow.length, 26);
+
+    buildPreviewTable(rows, 'stk-map-preview-tbl', maxCols);
+
+    function detectStkCol(keywords, fallback) {
+      const idx = firstRow.findIndex(h => keywords.some(kw => h.includes(kw)));
+      return idx >= 0 ? idx : fallback;
+    }
+
+    const sAutoCode = detectStkCol(['رقم الصنف','رقم صنف','كود','sku','item'], 0);
+    const sAutoName = detectStkCol(['اسم الصنف','اسم المنتج','اسم','name','وصف'], sAutoCode === 0 ? 1 : 0);
+    const sAutoQty  = detectStkCol(['فعلي نهائي','الفعلي النهائي','رصيد','كمية','stock','qty','quantity','مخزون'], 2);
+
+    buildColOptions('smap-code', firstRow, sAutoCode);
+    buildColOptions('smap-name', firstRow, sAutoName);
+    buildColOptions('smap-qty',  firstRow, sAutoQty);
+
+    const sAllDetected = [sAutoCode, sAutoQty].every(i => i >= 0 && i < firstRow.length);
+    const sErrEl = document.getElementById('stk-map-error');
+    sErrEl.style.display = 'none';
+    document.getElementById('stk-map-modal').classList.add('open');
+    if (sAllDetected && firstRow.some(h => h.length > 1)) {
+      sErrEl.style.color = 'var(--green)';
+      sErrEl.style.display = 'block';
+      sErrEl.textContent = '✅ تم اكتشاف الأعمدة تلقائياً — يمكنك تعديلها أو الضغط تأكيد مباشرة';
+    }
+    status.textContent = '';
+    document.getElementById('stock-file').value = '';
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
+  }
+}
+
+function closeStkMap() {
+  document.getElementById('stk-map-modal').classList.remove('open');
+  const sErrEl = document.getElementById('stk-map-error');
+  sErrEl.style.color = 'var(--red)';
+  sErrEl.style.display = 'none';
+  _pendingStockRows = null;
+  _pendingStockFile = null;
+  document.getElementById('stock-process-btn').style.display = 'none';
+  document.getElementById('stock-upload-text').textContent = 'انقر لاختيار ملف الرصيد';
+}
+
+function confirmStkMap() {
+  const rows = _pendingStockRows;
+  if (!rows) return;
+  const colCode = parseInt(document.getElementById('smap-code').value);
+  const colName = parseInt(document.getElementById('smap-name').value);
+  const colQty  = parseInt(document.getElementById('smap-qty').value);
+  const errEl   = document.getElementById('stk-map-error');
+  if (isNaN(colCode) || isNaN(colQty)) {
+    errEl.textContent = '⚠️ يرجى اختيار الأعمدة'; errEl.style.display = 'block'; return;
+  }
+  errEl.style.display = 'none';
+
+  const stockData = {};
+  let updated = 0, notFound = 0, skipped = 0;
+  const startRow = isNaN(Number(rows[0][colQty])) ? 1 : 0;
+
+  // أولاً: اقرأ كل الصفوف الصالحة وابنِ stockData
+  rows.forEach((row, ri) => {
+    if (ri < startRow) return;
+    const c = String(row[colCode] !== undefined && row[colCode] !== null ? row[colCode] : '')
+                .trim().replace(/\.0+$/, '');
+    if (!c) return;
+    const rawQty = row[colQty];
+    if (rawQty === '' || rawQty === null || rawQty === undefined) return;
+    const qty = Number(rawQty);
+    if (isNaN(qty)) return;
+    stockData[c] = qty;
+  });
+
+  // ثانياً: صفّر فقط المنتجات الموجودة في PRODUCTS (وليس الجديدة)
+  PRODUCTS.forEach((p, i) => {
+    PRODUCTS[i][5] = 0;
+    if (LOCAL_PRODUCTS[p[0]]) LOCAL_PRODUCTS[p[0]].stk = 0;
+  });
+
+  // ثالثاً: طبّق stockData
+  rows.forEach((row, ri) => {
+    if (ri < startRow) return;
+    const c = String(row[colCode] !== undefined && row[colCode] !== null ? row[colCode] : '')
+                .trim().replace(/\.0+$/, '');
+    if (!c) { skipped++; return; }
+    const rawQty = row[colQty];
+    if (rawQty === '' || rawQty === null || rawQty === undefined) { skipped++; return; }
+    const qty = Number(rawQty);
+    if (isNaN(qty)) { skipped++; return; }
+
+    const n = (!isNaN(colName) && row[colName] !== undefined)
+              ? String(row[colName]).trim() : '';
+
+    stockData[c] = qty;
+    const idx = CODE_MAP[c];
+    if (idx !== undefined) {
+      PRODUCTS[idx][5] = qty;
+      // حدّث الاسم إذا كان مؤقتاً (noPrice) وجاء اسم من الملف
+      if (n && LOCAL_PRODUCTS[c] && LOCAL_PRODUCTS[c].noPrice) {
+        PRODUCTS[idx][1] = n;
+        LOCAL_PRODUCTS[c].n = n;
+      }
+      if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = qty;
+      else LOCAL_PRODUCTS[c] = { c, stk: qty };
+      updated++;
+    } else {
+      // منتج غير موجود في الأسعار — أضفه باسمه ورصيده، السعر صفر مؤقتاً
+      const displayName = n || c;
+      const newIdx = PRODUCTS.length;
+      CODE_MAP[c] = newIdx;
+      PRODUCTS.push([c, displayName, 0, 0, 0, qty]);
+      LOCAL_PRODUCTS[c] = { c, n: displayName, o: 0, s: 0, d: 0, stk: qty, barcodes: [], noPrice: true };
+      stockData[c] = qty;
+      notFound++;
+    }
+  });
+
+  // مزامنة LOCAL_PRODUCTS مع PRODUCTS بعد تحديث الرصيد
+  PRODUCTS.forEach(p => {
+    const c = p[0];
+    if (!LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c] = { c, n: p[1], o: p[2], s: p[3], d: p[4], barcodes: [] };
+    LOCAL_PRODUCTS[c].stk = p[5];
+  });
+  localStorage.setItem('stock_data', JSON.stringify(stockData));
+  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+  const status = document.getElementById('stock-status');
+  status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>`
+    + (notFound ? ` — <span style="color:#1a4fa8">➕ ${notFound.toLocaleString('ar')} منتج جديد أُضيف من الرصيد</span>` : '');
+  closeStkMap();
+}
+
+
+
+// Reset
+function confirmReset() {
+  document.getElementById('reset-modal').classList.add('open');
+}
+
+function closeResetModal() {
+  document.getElementById('reset-modal').classList.remove('open');
+}
+
+function resetAllData() {
+  localStorage.removeItem('local_products');
+  localStorage.removeItem('stock_data');
+  PRODUCTS.length = 0;
+  Object.keys(CODE_MAP).forEach(k => delete CODE_MAP[k]);
+  Object.keys(BARCODE_MAP).forEach(k => delete BARCODE_MAP[k]);
+  Object.keys(LOCAL_PRODUCTS).forEach(k => delete LOCAL_PRODUCTS[k]);
+  closeResetModal();
+  clearForm();
+  clearResult();
+  document.getElementById('upload-status').textContent = '';
+  document.getElementById('stock-status').textContent = '';
+  document.getElementById('product-list').innerHTML = '';
+  document.getElementById('list-count').textContent = '';
+  const b = document.getElementById('success-banner');
+  b.textContent = '🗑️ تم مسح جميع البيانات بنجاح!';
+  b.style.cssText += ';background:#fdecea;border-color:#f5c6c2;color:var(--red)';
+  b.style.display = 'block';
+  setTimeout(() => {
+    b.style.display = 'none';
+    b.textContent = '✅ تمت العملية بنجاح!';
+    b.style.background = '';
+    b.style.borderColor = '';
+    b.style.color = '';
+  }, 3000);
+}
+
+// Export — جدول منسق ملون احترافي
+function exportData() {
+  const headers = ['الباركود','رقم الصنف','اسم الصنف','رصيد الصنف','السعر الأساسي','السعر بعد الخصم','نسبة الخصم'];
+
+  // بناء خريطة عكسية للباركود
+  const idx2barcodes = {};
+  Object.entries(BARCODE_MAP).forEach(([b, idx]) => {
+    if (!idx2barcodes[idx]) idx2barcodes[idx] = [];
+    idx2barcodes[idx].push(b);
+  });
+
+  const dataRows = [];
+  PRODUCTS.forEach((p, i) => {
+    const barcodes = idx2barcodes[i] || [''];
+    barcodes.forEach(b => {
+      const orig = parseFloat(p[2]) || 0;
+      const sale = parseFloat(p[3]) || 0;
+      const disc = (p[4] !== undefined && !isNaN(p[4])) ? p[4] : (orig > 0 && sale > 0 ? Math.round((orig - sale) / orig * 100) : 0);
+      dataRows.push([
+        b,              // باركود
+        p[0],           // رقم الصنف
+        p[1],           // اسم الصنف
+        p[5] ?? 0,      // رصيد الصنف
+        orig,           // السعر الأساسي
+        sale,           // السعر بعد الخصم
+        disc            // نسبة الخصم
+      ]);
+    });
+  });
+
+  // ===== بناء الشيت =====
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+
+  // عرض الأعمدة
+  ws['!cols'] = [
+    { wch: 20 }, // باركود
+    { wch: 24 }, // رقم الصنف
+    { wch: 38 }, // اسم الصنف
+    { wch: 14 }, // رصيد الصنف
+    { wch: 16 }, // السعر الأساسي
+    { wch: 18 }, // السعر بعد الخصم
+    { wch: 14 }, // نسبة الخصم
+  ];
+
+  // اتجاه الشيت من اليمين لليسار
+  ws['!sheetView'] = { rightToLeft: true };
+
+  // تجميد الصف الأول
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  // ارتفاع الصفوف
+  const rowHeights = [{ hpt: 26 }]; // رأس الجدول طويل
+  dataRows.forEach(() => rowHeights.push({ hpt: 20 }));
+  ws['!rows'] = rowHeights;
+
+  // ===== تعريف الستايلات =====
+
+  // حدود مشتركة - داكنة للرأس
+  const headerBorder = {
+    top:    { style: 'medium', color: { rgb: '0A3D1F' } },
+    bottom: { style: 'medium', color: { rgb: '0A3D1F' } },
+    left:   { style: 'thin',   color: { rgb: '1A6B3C' } },
+    right:  { style: 'thin',   color: { rgb: '1A6B3C' } },
+  };
+  // حدود خفيفة للبيانات
+  const dataBorderEven = {
+    top:    { style: 'hair', color: { rgb: 'B3DCC0' } },
+    bottom: { style: 'hair', color: { rgb: 'B3DCC0' } },
+    left:   { style: 'thin', color: { rgb: 'C8E6D0' } },
+    right:  { style: 'thin', color: { rgb: 'C8E6D0' } },
+  };
+  const dataBorderOdd = {
+    top:    { style: 'hair', color: { rgb: 'E0EDE0' } },
+    bottom: { style: 'hair', color: { rgb: 'E0EDE0' } },
+    left:   { style: 'thin', color: { rgb: 'DDEBDD' } },
+    right:  { style: 'thin', color: { rgb: 'DDEBDD' } },
+  };
+
+  // رأس الجدول — أخضر داكن مع نص أبيض عريض
+  const headerStyle = {
+    font:      { bold: true, color: { rgb: 'FFFFFF' }, sz: 12, name: 'Arial' },
+    fill:      { patternType: 'solid', fgColor: { rgb: '0F5C2E' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: false, readingOrder: 2 },
+    border:    headerBorder
+  };
+
+  // صف زوجي — أخضر فاتح جداً
+  const baseEven = {
+    font:      { sz: 11, name: 'Arial', color: { rgb: '1A2E1A' } },
+    fill:      { patternType: 'solid', fgColor: { rgb: 'EDF7F1' } },
+    alignment: { horizontal: 'center', vertical: 'center', readingOrder: 2 },
+    border:    dataBorderEven
+  };
+  // صف فردي — أبيض
+  const baseOdd = {
+    font:      { sz: 11, name: 'Arial', color: { rgb: '1A2E1A' } },
+    fill:      { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } },
+    alignment: { horizontal: 'center', vertical: 'center', readingOrder: 2 },
+    border:    dataBorderOdd
+  };
+
+  // اسم المنتج — محاذاة يمين
+  const nameStyleEven = { ...baseEven, alignment: { horizontal: 'right', vertical: 'center', readingOrder: 2 }, font: { sz: 11, name: 'Arial', color: { rgb: '1A2E1A' }, bold: true } };
+  const nameStyleOdd  = { ...baseOdd,  alignment: { horizontal: 'right', vertical: 'center', readingOrder: 2 }, font: { sz: 11, name: 'Arial', color: { rgb: '1A2E1A' }, bold: true } };
+
+  // رصيد — أزرق
+  const stockStyleEven = { ...baseEven, font: { sz: 11, name: 'Arial', bold: true, color: { rgb: '1A4FA8' } }, fill: { patternType: 'solid', fgColor: { rgb: 'DCE9FF' } } };
+  const stockStyleOdd  = { ...baseOdd,  font: { sz: 11, name: 'Arial', bold: true, color: { rgb: '1A4FA8' } }, fill: { patternType: 'solid', fgColor: { rgb: 'EAF1FF' } } };
+
+  // السعر الأصلي — رمادي
+  const origStyleEven = { ...baseEven, font: { sz: 11, name: 'Arial', color: { rgb: '777777' }, italic: true } };
+  const origStyleOdd  = { ...baseOdd,  font: { sz: 11, name: 'Arial', color: { rgb: '777777' }, italic: true } };
+
+  // السعر بعد الخصم — أخضر غامق عريض
+  const saleStyleEven = { ...baseEven, font: { sz: 12, name: 'Arial', bold: true, color: { rgb: '0F6B35' } }, fill: { patternType: 'solid', fgColor: { rgb: 'D6F0E3' } } };
+  const saleStyleOdd  = { ...baseOdd,  font: { sz: 12, name: 'Arial', bold: true, color: { rgb: '0F6B35' } }, fill: { patternType: 'solid', fgColor: { rgb: 'E6F7ED' } } };
+
+  // نسبة الخصم — أحمر للقيم > 0، رمادي للصفر
+  function discStyle(val, isEven) {
+    if (val > 0) {
+      return {
+        ...(isEven ? baseEven : baseOdd),
+        font: { sz: 11, name: 'Arial', bold: true, color: { rgb: 'C0392B' } },
+        fill: { patternType: 'solid', fgColor: { rgb: isEven ? 'FDECEA' : 'FEF3F2' } }
+      };
+    }
+    return isEven ? baseEven : baseOdd;
+  }
+
+  const colLetters = ['A','B','C','D','E','F','G'];
+
+  // ===== تطبيق ستايل رأس الجدول =====
+  colLetters.forEach(col => {
+    const cell = ws[col + '1'];
+    if (cell) cell.s = headerStyle;
+  });
+
+  // ===== تطبيق ستايل صفوف البيانات =====
+  dataRows.forEach((row, ri) => {
+    const rowNum = ri + 2;
+    const isEven = ri % 2 === 0;
+    const discVal = row[6]; // نسبة الخصم
+
+    colLetters.forEach((col, ci) => {
+      const cellRef = col + rowNum;
+      if (!ws[cellRef]) return;
+      let style;
+      switch (ci) {
+        case 2: style = isEven ? nameStyleEven  : nameStyleOdd;  break; // اسم
+        case 3: style = isEven ? stockStyleEven : stockStyleOdd; break; // رصيد
+        case 4: style = isEven ? origStyleEven  : origStyleOdd;  break; // سعر أصلي
+        case 5: style = isEven ? saleStyleEven  : saleStyleOdd;  break; // سعر خصم
+        case 6: style = discStyle(discVal, isEven);               break; // خصم%
+        default: style = isEven ? baseEven : baseOdd;
+      }
+      ws[cellRef].s = style;
+
+      // تنسيق الأرقام — تأكيد نوع رقمي لإظهار أرقام إنجليزية
+      if (ci === 4 || ci === 5) {
+        ws[cellRef].t = 'n';
+        ws[cellRef].v = parseFloat(ws[cellRef].v) || 0;
+        ws[cellRef].z = '#,##0.00';
+      }
+      if (ci === 3) {
+        ws[cellRef].t = 'n';
+        ws[cellRef].v = parseFloat(ws[cellRef].v) || 0;
+        ws[cellRef].z = '#,##0';
+      }
+      if (ci === 6) {
+        ws[cellRef].t = 'n';
+        ws[cellRef].v = discVal || 0;
+        ws[cellRef].z = '0"%"';
+      }
+    });
+  });
+
+  // ===== إنشاء الملف =====
+  const wb = XLSX.utils.book_new();
+  wb.Props = { Title: 'قائمة الأسعار والمخزون', Author: 'Aly Alansary', CreatedDate: new Date() };
+  XLSX.utils.book_append_sheet(wb, ws, 'المنتجات');
+  XLSX.writeFile(wb, 'الأنصاري_الأسعار_والمخزون.xlsx');
+}
+
+document.getElementById('excel-upload-area').addEventListener('click', () => document.getElementById('excel-file').click());
+document.getElementById('stock-upload-area').addEventListener('click', () => document.getElementById('stock-file').click());
+document.getElementById('excel-file').addEventListener('change', handleExcelUpload);
+document.getElementById('stock-file').addEventListener('change', handleStockUpload);
+</script>
+</body>
+</html>
