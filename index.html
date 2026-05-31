@@ -1143,40 +1143,44 @@ function confirmColMap() {
 
     // تنظيف الباركود — يمكن أن يكون فارغاً
     const b = String(row[colB] !== undefined && row[colB] !== null ? row[colB] : '').trim().replace(/\.0+$/, '');
-    const c = String(row[colC] || '').trim();
-    const n = String(row[colN] || '').trim();
-    const o = parseFloat(row[colO]);
-    // السعر بعد الخصم: إذا كان غائباً أو صفراً استخدم السعر الأصلي
+    const c = String(row[colC] !== undefined && row[colC] !== null ? row[colC] : '').trim().replace(/\.0+$/, '');
+    const n = String(row[colN] !== undefined && row[colN] !== null ? row[colN] : '').trim();
+    const oRaw = parseFloat(row[colO]);
+    const o = isNaN(oRaw) ? 0 : oRaw;
     const sRaw = parseFloat(row[colS]);
     const s = (!isNaN(sRaw) && sRaw > 0) ? sRaw : o;
 
-    // تخطّ الصفوف الفاسدة فقط: لازم رقم صنف + اسم + سعر أصلي
-    if (!c || !n || isNaN(o) || o <= 0 || n.length < 2) { countSkipped++; return; }
+    // تخطّ الصف فقط إذا كان فارغاً تماماً (لا باركود ولا رقم صنف ولا اسم)
+    if (!b && !c && !n) { countSkipped++; return; }
 
-    const d = Math.round((o - s) / o * 100);
-    const existIdx = CODE_MAP[c];
+    // إذا لا يوجد رقم صنف استخدم الباركود كمعرّف
+    const key = c || b;
+    const displayName = n || key;
+
+    const d = o > 0 && s < o ? Math.round((o - s) / o * 100) : 0;
+    const existIdx = CODE_MAP[key];
 
     if (existIdx !== undefined) {
       // المنتج موجود — حدّث الأسعار واحتفظ بالرصيد والاسم القديم
       const prev = PRODUCTS[existIdx];
       const prevStk = prev[5];
-      const updatedName = n || prev[1];
-      PRODUCTS[existIdx] = [c, updatedName, o, s, d, prevStk];
+      const updatedName = displayName || prev[1];
+      PRODUCTS[existIdx] = [key, updatedName, o, s, d, prevStk];
       if (b && BARCODE_MAP[b] === undefined) BARCODE_MAP[b] = existIdx;
-      const prevLocal = LOCAL_PRODUCTS[c] || {};
+      const prevLocal = LOCAL_PRODUCTS[key] || {};
       const prevBarcodes = Array.isArray(prevLocal.barcodes) ? prevLocal.barcodes : (prevLocal.b ? [prevLocal.b] : []);
       if (b && !prevBarcodes.includes(b)) prevBarcodes.push(b);
       // إزالة علامة noPrice عند اكتمال البيانات
       const { noPrice: _, ...restLocal } = prevLocal;
-      LOCAL_PRODUCTS[c] = { ...restLocal, c, n: updatedName, o, s, d, stk: prevStk, barcodes: prevBarcodes };
+      LOCAL_PRODUCTS[key] = { ...restLocal, c: key, n: updatedName, o, s, d, stk: prevStk, barcodes: prevBarcodes };
       countUpdated++;
     } else {
       // منتج جديد — أضفه كاملاً
       const idx = PRODUCTS.length;
-      CODE_MAP[c] = idx;
-      PRODUCTS.push([c, n, o, s, d, undefined]);
+      CODE_MAP[key] = idx;
+      PRODUCTS.push([key, displayName, o, s, d, undefined]);
       if (b) BARCODE_MAP[b] = idx;
-      LOCAL_PRODUCTS[c] = { c, n, o, s, d, barcodes: b ? [b] : [] };
+      LOCAL_PRODUCTS[key] = { c: key, n: displayName, o, s, d, barcodes: b ? [b] : [] };
       countNew++;
     }
   });
