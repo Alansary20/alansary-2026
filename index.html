@@ -283,7 +283,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
       <div style="font-weight:700; margin-bottom:12px; font-size:0.9rem; display:flex; align-items:center; gap:8px;">
         <i class="fas fa-file-excel" style="color:var(--green);"></i> رفع ملف Excel الأسعار
       </div>
-      <div class="file-label" id="excelUploadArea"><i class="fas fa-upload"></i> رفع ملف المنتجات <input type="file" id="excelFileInput" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none;" multiple></div>
+      <div class="file-label" id="excelUploadArea"><span id="excelUploadAreaLabel"><i class="fas fa-upload"></i> رفع ملف المنتجات</span><input type="file" id="excelFileInput" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none;" multiple></div>
       <div style="display:flex; gap:6px; margin-bottom:8px; background:var(--bg); border-radius:12px; padding:5px;">
         <button id="excelModeUpdate" style="flex:1; border:none; padding:9px 8px; border-radius:9px; font-size:0.8rem; font-weight:700; cursor:pointer; font-family:inherit; background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.12)); color:var(--green); border:1px solid rgba(16,185,129,0.3); transition:all 0.18s;">
           <i class="fas fa-sync-alt" style="margin-left:5px;"></i> تحديث
@@ -307,7 +307,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
       <div style="font-weight:700; margin-bottom:12px; font-size:0.9rem; display:flex; align-items:center; gap:8px;">
         <i class="fas fa-file-excel" style="color:var(--green);"></i> رفع ملف الرصيد الفعلي (مرجع)
       </div>
-      <div class="file-label" id="stockUploadArea2"><i class="fas fa-upload"></i> اختر ملف Excel <input type="file" id="stockFileInput2" accept=".xlsx,.xlsm,.xls" style="display:none;"></div>
+      <div class="file-label" id="stockUploadArea2"><span id="stockUploadAreaLabel2"><i class="fas fa-upload"></i> اختر ملف Excel</span><input type="file" id="stockFileInput2" accept=".xlsx,.xlsm,.xls" style="display:none;"></div>
       <div style="display:flex; gap:6px; margin-bottom:8px; background:var(--bg); border-radius:12px; padding:5px;">
         <button id="stockModeUpdate2" style="flex:1; border:none; padding:9px 8px; border-radius:9px; font-size:0.8rem; font-weight:700; cursor:pointer; font-family:inherit; background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.12)); color:var(--green); border:1px solid rgba(16,185,129,0.3); transition:all 0.18s;">
           <i class="fas fa-sync-alt" style="margin-left:5px;"></i> تحديث
@@ -1332,15 +1332,9 @@ let pendingExcelFiles2 = [];
 document.getElementById('excelFileInput').addEventListener('change', (e) => {
     pendingExcelFiles2 = Array.from(e.target.files);
     if (pendingExcelFiles2.length) {
-        document.getElementById('excelUploadArea').innerHTML =
+        document.getElementById('excelUploadAreaLabel').innerHTML =
             '<i class="fas fa-check-circle" style="color:var(--green);margin-left:6px;"></i> ' +
-            pendingExcelFiles2.map(f=>f.name).join(', ') +
-            ' <input type="file" id="excelFileInput" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none;" multiple>';
-        // إعادة ربط listener بعد إعادة بناء HTML
-        document.getElementById('excelUploadArea').querySelector('input[type=file]')
-            .addEventListener('change', (ev) => {
-                pendingExcelFiles2 = Array.from(ev.target.files);
-            });
+            pendingExcelFiles2.map(f=>f.name).join(', ');
     }
 });
 document.getElementById('excelUploadArea').addEventListener('click', () =>
@@ -1418,12 +1412,9 @@ let pendingStockFiles2 = [];
 document.getElementById('stockFileInput2').addEventListener('change', (e) => {
     pendingStockFiles2 = Array.from(e.target.files);
     if (pendingStockFiles2.length) {
-        document.getElementById('stockUploadArea2').innerHTML =
+        document.getElementById('stockUploadAreaLabel2').innerHTML =
             '<i class="fas fa-check-circle" style="color:var(--green);margin-left:6px;"></i> ' +
-            pendingStockFiles2.map(f=>f.name).join(', ') +
-            ' <input type="file" id="stockFileInput2" accept=".xlsx,.xlsm,.xls" style="display:none;">';
-        document.getElementById('stockUploadArea2').querySelector('input[type=file]')
-            .addEventListener('change', (ev) => { pendingStockFiles2 = Array.from(ev.target.files); });
+            pendingStockFiles2.map(f=>f.name).join(', ');
     }
 });
 document.getElementById('stockUploadArea2').addEventListener('click', () =>
