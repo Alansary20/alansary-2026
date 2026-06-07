@@ -2369,13 +2369,19 @@
         });
     };
 
-    // ── كاميرا ZXing — تبويب المسح ──
-    let _zxingMain = null;
-    let _zxingMainStream = null;
+    // ══════════════════════════════════════════════════
+    //  محرك الكاميرا الرئيسي — ZXing 0.19.1 (API صحيح)
+    // ══════════════════════════════════════════════════
+    let _zxReader   = null;   // ZXing.BrowserMultiFormatReader instance
+    let _zxControls = null;   // controls object returned by decodeFromVideoDevice
+    let _zxLastScan = 0;
 
+    // ── قائمة الكاميرات ──
     async function listCameras() {
         try {
-            const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+            // نحتاج instance لاستدعاء listVideoInputDevices
+            const tmpReader = new ZXing.BrowserMultiFormatReader();
+            const devices   = await tmpReader.listVideoInputDevices();
             availableCameras = devices.map(d => ({ id: d.deviceId, label: d.label }));
             const select = document.getElementById('cameraSelect');
             select.innerHTML = '<option value="">اختر الكاميرا</option>';
@@ -2389,6 +2395,7 @@
                 const savedCamId = await loadSetting('invSelectedCamera', '');
                 let selectedCam = savedCamId ? availableCameras.find(d => d.id === savedCamId) : null;
                 if (!selectedCam) {
+                    // أولوية: كاميرا 3 ← الخلفية ← الأخيرة
                     selectedCam = availableCameras[2]
                         || availableCameras.find(d => /back|rear|خلفية|environment/i.test(d.label || ''))
                         || availableCameras[availableCameras.length - 1];
@@ -2400,40 +2407,81 @@
                 currentCameraId = select.value;
                 saveSetting('invSelectedCamera', currentCameraId);
             };
-        } catch (err) { console.warn('listCameras:', err); }
+        } catch (err) { console.warn('listCameras error:', err); }
     }
 
+    // ── إيقاف الكاميرا ──
+    async function _stopMainStream() {
+        if (_zxControls) {
+            try { _zxControls.stop(); } catch(e) {}
+            _zxControls = null;
+        }
+        if (_zxReader) {
+            try { _zxReader.reset(); } catch(e) {}
+            _zxReader = null;
+        }
+        // أوقف stream بشكل صريح
+        const vid = document.getElementById('reader2');
+        if (vid && vid.srcObject) {
+            vid.srcObject.getTracks().forEach(t => t.stop());
+            vid.srcObject = null;
+        }
+    }
+
+    // ── تشغيل الكاميرا ──
     async function startCamera(cameraId = null) {
-        await _stopMainZxing();
+        await _stopMainStream();
         scanningActive = false;
         const cameraDiv = document.getElementById('cameraDiv');
         const scanLine  = document.getElementById('scanLine');
         cameraDiv.classList.remove('hidden');
         setScanStatus('scanning', 'جاري تشغيل الكاميرا...');
+
+        const videoEl = document.getElementById('reader2');
+        const targetId = cameraId || currentCameraId || null;
+
+        // إعادة بناء hints لتحسين قراءة الباركود
+        const hints = new Map();
+        const formats = [
+            ZXing.BarcodeFormat.EAN_13,
+            ZXing.BarcodeFormat.EAN_8,
+            ZXing.BarcodeFormat.CODE_128,
+            ZXing.BarcodeFormat.CODE_39,
+            ZXing.BarcodeFormat.UPC_A,
+            ZXing.BarcodeFormat.UPC_E,
+            ZXing.BarcodeFormat.ITF,
+            ZXing.BarcodeFormat.CODABAR,
+            ZXing.BarcodeFormat.QR_CODE,
+        ].filter(Boolean);
+        if (formats.length) hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
         try {
-            const targetId = cameraId || currentCameraId || (availableCameras[0]?.id);
-            if (!targetId) throw new Error('لا توجد كاميرا متاحة');
-            const videoEl = document.getElementById('reader2');
-            if (!videoEl) throw new Error('عنصر الفيديو غير موجود');
-            _zxingMain = new ZXing.BrowserMultiFormatReader(null, {
-                delayBetweenScanAttempts: 80,
-                delayBetweenScanSuccess: 1200
-            });
-            await _zxingMain.decodeFromVideoDevice(targetId, videoEl, (result, err) => {
-                if (result) {
-                    const decoded = result.getText();
-                    onCameraScan(decoded);
-                    const code = sanitizeBarcode(decoded);
-                    if (code) document.getElementById('barcodeInput').value = code;
+            _zxReader = new ZXing.BrowserMultiFormatReader(hints, 150);
+            // decodeFromVideoDevice(deviceId, videoElement, callbackFn) → Promise<IScannerControls>
+            _zxControls = await _zxReader.decodeFromVideoDevice(
+                targetId,
+                videoEl,
+                (result, error, controls) => {
+                    if (result) {
+                        const now = Date.now();
+                        if (now - _zxLastScan < _mainScanDelay) return;
+                        _zxLastScan = now;
+                        const decoded = result.getText();
+                        onCameraScan(decoded);
+                        const code = sanitizeBarcode(decoded);
+                        if (code) document.getElementById('barcodeInput').value = code;
+                    }
                 }
-            });
-            scanningActive = true;
-            currentCameraId = targetId;
+            );
+            scanningActive   = true;
+            currentCameraId  = targetId || currentCameraId;
             if (scanLine) scanLine.style.display = 'block';
             document.getElementById('closeCamBtn').style.display = 'flex';
             setScanStatus('ready', t('cameraActive'));
             initAudio();
         } catch (err) {
+            console.error('startCamera error:', err);
             showToast(t('cameraError') + ' ' + err.message, true);
             cameraDiv.classList.add('hidden');
             if (scanLine) scanLine.style.display = 'none';
@@ -2443,21 +2491,10 @@
         }
     }
 
-    async function _stopMainZxing() {
-        if (_zxingMain) {
-            try { _zxingMain.reset(); } catch(e) {}
-            _zxingMain = null;
-        }
-        // أوقف stream مباشرة
-        const vid = document.getElementById('reader2');
-        if (vid && vid.srcObject) {
-            vid.srcObject.getTracks().forEach(t => t.stop());
-            vid.srcObject = null;
-        }
-    }
+    let _mainScanDelay = 1200;
 
     async function closeCamera() {
-        await _stopMainZxing();
+        await _stopMainStream();
         scanningActive = false;
         document.getElementById('cameraDiv').classList.add('hidden');
         document.getElementById('closeCamBtn').style.display = 'none';
@@ -2478,13 +2515,21 @@
         await startCamera(nextCam.id);
     }
 
+    // مزامنة تأخير المسح مع الـ slider
+    const scanDelaySlider = document.getElementById('scanDelaySlider');
+    if (scanDelaySlider) {
+        _mainScanDelay = Math.round(parseFloat(scanDelaySlider.value) * 1000);
+        scanDelaySlider.addEventListener('input', function() {
+            _mainScanDelay = Math.round(parseFloat(this.value) * 1000);
+        });
+    }
+
     document.getElementById('startCamBtn').onclick = async () => {
         initAudio();
         if (!availableCameras.length) await listCameras();
         const selected = document.getElementById('cameraSelect').value;
-        const targetId = selected || currentCameraId || (availableCameras[0]?.id);
-        if (targetId) await startCamera(targetId);
-        else showToast(t('noCamera'), true);
+        const targetId = selected || currentCameraId || null;
+        await startCamera(targetId);
     };
     document.getElementById('switchCamBtn').onclick = switchCamera;
     document.getElementById('closeCamBtn').onclick = closeCamera;
@@ -3492,8 +3537,11 @@
         let target = this.getAttribute('data-tab');
         // أغلق الكاميرا فوراً عند مغادرة تبويب المسح
         if (target !== 'tab-scan') {
-            // أوقف ZXing الرئيسي
-            if (typeof _stopMainZxing === 'function') _stopMainZxing();
+            // أوقف الكاميرا الرئيسية
+            if (typeof _zxControls !== 'undefined' && _zxControls) { try { _zxControls.stop(); } catch(e){} _zxControls = null; }
+            if (typeof _zxReader !== 'undefined' && _zxReader) { try { _zxReader.reset(); } catch(e){} _zxReader = null; }
+            const _tabVid = document.getElementById('reader2');
+            if (_tabVid && _tabVid.srcObject) { _tabVid.srcObject.getTracks().forEach(t=>t.stop()); _tabVid.srcObject=null; }
             scanningActive = false;
             const scanLine = document.getElementById('scanLine');
             if (scanLine) scanLine.style.display = 'none';
@@ -4588,9 +4636,10 @@ async function exportPricesData() {
 }
 
 // ══════════════════════════════════════════════════
-//  سكانر كاميرا تبويب الأسعار — ZXing
+//  سكانر كاميرا تبويب الأسعار — ZXing 0.19.1 (API صحيح)
 // ══════════════════════════════════════════════════
-var _zxingPrices     = null;
+var _pzxReader    = null;   // ZXing instance
+var _pzxControls  = null;   // controls
 var _pricesCamActive = false;
 var _pricesCamList   = [];
 var _pricesCurCam    = null;
@@ -4603,9 +4652,29 @@ function _pricesSetStatus(msg) {
     if (el) el.textContent = msg;
 }
 
+// ── إيقاف كاميرا الأسعار ──
+async function _pricesStop() {
+    if (_pzxControls) {
+        try { _pzxControls.stop(); } catch(e) {}
+        _pzxControls = null;
+    }
+    if (_pzxReader) {
+        try { _pzxReader.reset(); } catch(e) {}
+        _pzxReader = null;
+    }
+    var vid = document.getElementById('prices-reader');
+    if (vid && vid.srcObject) {
+        vid.srcObject.getTracks().forEach(function(t) { t.stop(); });
+        vid.srcObject = null;
+    }
+    _pricesCamActive = false;
+}
+
+// ── جلب قائمة الكاميرات ──
 async function _pricesLoadCameras() {
     try {
-        var devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+        var tmpReader = new ZXing.BrowserMultiFormatReader();
+        var devices   = await tmpReader.listVideoInputDevices();
         _pricesCamList = devices.map(function(d) { return { id: d.deviceId, label: d.label }; });
         var sel = document.getElementById('prices-cam-select');
         if (!sel || !_pricesCamList.length) return;
@@ -4616,72 +4685,76 @@ async function _pricesLoadCameras() {
             o.textContent = d.label || ('كاميرا ' + (i + 1));
             sel.appendChild(o);
         });
+        // الكاميرا الخلفية أولاً
         var back = _pricesCamList.find(function(d) { return /back|rear|environment/i.test(d.label || ''); })
                    || _pricesCamList[_pricesCamList.length - 1];
         _pricesCurCam = back.id;
         sel.value = _pricesCurCam;
         sel.onchange = function() { _pricesCurCam = this.value; };
-    } catch(e) { console.warn('prices cameras:', e); }
+    } catch(e) { console.warn('prices listCameras:', e); }
 }
 
-async function _pricesStopZxing() {
-    if (_zxingPrices) {
-        try { _zxingPrices.reset(); } catch(e) {}
-        _zxingPrices = null;
-    }
-    var vid = document.getElementById('prices-reader');
-    if (vid && vid.srcObject) {
-        vid.srcObject.getTracks().forEach(function(t) { t.stop(); });
-        vid.srcObject = null;
-    }
-    _pricesCamActive = false;
-}
-
+// ── تشغيل كاميرا الأسعار ──
 async function _pricesStartCam(camId) {
-    await _pricesStopZxing();
-    var targetId = camId || _pricesCurCam || (_pricesCamList[0] && _pricesCamList[0].id);
-    if (!targetId) { _pricesSetStatus('❌ لا توجد كاميرا'); return; }
+    await _pricesStop();
+
+    var targetId = camId || _pricesCurCam || null;
     var vid = document.getElementById('prices-reader');
     if (!vid) { _pricesSetStatus('❌ خطأ في التهيئة'); return; }
+
+    var hints = new Map();
+    var formats = [
+        ZXing.BarcodeFormat.EAN_13,
+        ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.CODE_128,
+        ZXing.BarcodeFormat.CODE_39,
+        ZXing.BarcodeFormat.UPC_A,
+        ZXing.BarcodeFormat.UPC_E,
+        ZXing.BarcodeFormat.ITF,
+        ZXing.BarcodeFormat.CODABAR,
+        ZXing.BarcodeFormat.QR_CODE,
+    ].filter(Boolean);
+    if (formats.length) hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
     try {
-        _zxingPrices = new ZXing.BrowserMultiFormatReader(null, {
-            delayBetweenScanAttempts: 80,
-            delayBetweenScanSuccess: PRICES_SCAN_DELAY
-        });
-        await _zxingPrices.decodeFromVideoDevice(targetId, vid, function(result, err) {
-            if (result) _pricesOnScan(result.getText());
-        });
+        _pzxReader   = new ZXing.BrowserMultiFormatReader(hints, 150);
+        _pzxControls = await _pzxReader.decodeFromVideoDevice(
+            targetId,
+            vid,
+            function(result, error, controls) {
+                if (!result) return;
+                var now = Date.now();
+                if (_pricesScanLock || now - _pricesLastScan < PRICES_SCAN_DELAY) return;
+                _pricesScanLock = true;
+                _pricesLastScan = now;
+                var code = String(result.getText() || '').trim().replace(/\.0+$/, '');
+                if (!code) { _pricesScanLock = false; return; }
+                var inp = document.getElementById('prices-search-input');
+                if (inp) inp.value = code;
+                var isNum = /^\d+$/.test(code);
+                if (isNum && priceSearchType !== 'barcode') setPriceSearchType('barcode');
+                else if (!isNum && priceSearchType === 'barcode') setPriceSearchType('code');
+                doPriceSearch();
+                _pricesSetStatus('✅ تم مسح: ' + code);
+                if (navigator.vibrate) navigator.vibrate(60);
+                setTimeout(function() {
+                    _pricesScanLock = false;
+                    if (_pricesCamActive) _pricesSetStatus('🎯 وجّه الكاميرا نحو الباركود');
+                }, PRICES_SCAN_DELAY);
+            }
+        );
         _pricesCamActive = true;
-        _pricesCurCam = targetId;
+        _pricesCurCam    = targetId || _pricesCurCam;
         _pricesSetStatus('🎯 وجّه الكاميرا نحو الباركود');
     } catch(err) {
         _pricesCamActive = false;
-        _pricesSetStatus('❌ تعذّر تشغيل الكاميرا: ' + (err.message || err));
+        _pricesSetStatus('❌ ' + (err.message || err));
         console.error('prices cam error:', err);
     }
 }
 
-function _pricesOnScan(raw) {
-    var now = Date.now();
-    if (_pricesScanLock || now - _pricesLastScan < PRICES_SCAN_DELAY) return;
-    _pricesScanLock = true;
-    _pricesLastScan = now;
-    var code = String(raw || '').trim().replace(/\.0+$/, '');
-    if (!code) { _pricesScanLock = false; return; }
-    var inp = document.getElementById('prices-search-input');
-    if (inp) inp.value = code;
-    var isNum = /^\d+$/.test(code);
-    if (isNum && priceSearchType !== 'barcode') setPriceSearchType('barcode');
-    else if (!isNum && priceSearchType === 'barcode') setPriceSearchType('code');
-    doPriceSearch();
-    _pricesSetStatus('✅ تم مسح: ' + code);
-    if (navigator.vibrate) navigator.vibrate(60);
-    setTimeout(function() {
-        _pricesScanLock = false;
-        if (_pricesCamActive) _pricesSetStatus('🎯 وجّه الكاميرا نحو الباركود');
-    }, PRICES_SCAN_DELAY);
-}
-
+// ── فتح/إغلاق كاميرا الأسعار ──
 async function togglePricesCamera() {
     if (_pricesCamActive) { await closePricesCamera(); return; }
     var area = document.getElementById('prices-camera-area');
@@ -4690,11 +4763,11 @@ async function togglePricesCamera() {
     if (btn) { btn.style.background = 'linear-gradient(135deg,#dc2626,#ef4444)'; btn.innerHTML = '<i class="fas fa-times"></i>'; }
     _pricesSetStatus('⏳ جاري تحميل الكاميرا...');
     if (!_pricesCamList.length) await _pricesLoadCameras();
-    setTimeout(function() { _pricesStartCam(); }, 50);
+    await _pricesStartCam(_pricesCurCam || null);
 }
 
 async function closePricesCamera() {
-    await _pricesStopZxing();
+    await _pricesStop();
     var area = document.getElementById('prices-camera-area');
     if (area) area.style.display = 'none';
     var btn = document.getElementById('prices-cam-btn');
