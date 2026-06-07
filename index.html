@@ -114,17 +114,31 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 
 /* Edit/Add page */
 .form-card{background:var(--card);border-radius:14px;border:1px solid var(--border);padding:16px;margin-bottom:12px}
+        /* ── FILE UPLOAD (style from الجرد) ── */
+        .file-label {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            cursor: pointer;
+            border: 1px dashed rgba(99,102,241,0.3);
+            margin-bottom: 14px;
+            color: var(--text2);
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .file-label:hover {
+            border-color: var(--green);
+            color: var(--green);
+            background: var(--green-light);
+        }
 .form-title{font-size:14px;font-weight:700;color:var(--green);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .form-row{margin-bottom:12px}
 .form-label{font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:600;display:block}
 .form-input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;font-family:inherit;outline:none;direction:ltr;text-align:right}
 .form-input.rtl{direction:rtl;text-align:right}
 .form-input:focus{border-color:var(--green)}
-.upload-area{border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;cursor:pointer;background:#f9fdf9;transition:.2s}
-.upload-area:hover{border-color:var(--green);background:var(--green-light)}
-.upload-icon{font-size:28px;margin-bottom:6px}
-.upload-text{font-size:12px;color:var(--text2)}
-.upload-hint{font-size:11px;color:var(--text3);margin-top:4px}
+
 .success-banner{background:#e8f5ee;border:1px solid #b3dcc0;border-radius:10px;padding:10px 14px;color:var(--green);font-size:13px;text-align:center;margin-bottom:10px;display:none}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;justify-content:center;display:none}
 .modal-overlay.open{display:flex}
@@ -262,32 +276,52 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
       </div>
     </div>
 
+
+
+    <!-- رفع ملف Excel الأسعار — نفس أسلوب ملف الجرد -->
     <div class="form-card">
-      <div class="form-title">📤 رفع ملف Excel الأسعار</div>
-      <div class="upload-area" id="excel-upload-area">
-        <div class="upload-icon">📊</div>
-        <div class="upload-text" id="excel-upload-text">انقر لاختيار ملف Excel الأسعار</div>
-        <div class="upload-hint">يدعم .xlsm و .xlsx — ستختار الأعمدة بعد الرفع</div>
-        <input type="file" id="excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none">
+      <div style="font-weight:700; margin-bottom:12px; font-size:0.9rem; display:flex; align-items:center; gap:8px;">
+        <i class="fas fa-file-excel" style="color:var(--green);"></i> رفع ملف Excel الأسعار
       </div>
-      <button class="btn btn-green" id="excel-process-btn" onclick="processExcelFile()" style="display:none;width:100%;margin-top:10px">📤 رفع الملف المختار</button>
-      <div id="upload-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
+      <div class="file-label" id="excelUploadArea"><i class="fas fa-upload"></i> رفع ملف المنتجات <input type="file" id="excelFileInput" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none;" multiple></div>
+      <div style="display:flex; gap:6px; margin-bottom:8px; background:var(--bg); border-radius:12px; padding:5px;">
+        <button id="excelModeUpdate" style="flex:1; border:none; padding:9px 8px; border-radius:9px; font-size:0.8rem; font-weight:700; cursor:pointer; font-family:inherit; background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.12)); color:var(--green); border:1px solid rgba(16,185,129,0.3); transition:all 0.18s;">
+          <i class="fas fa-sync-alt" style="margin-left:5px;"></i> تحديث
+        </button>
+        <button id="excelModeMerge" style="flex:1; border:none; padding:9px 8px; border-radius:9px; font-size:0.8rem; font-weight:700; cursor:pointer; font-family:inherit; background:transparent; color:var(--text2); border:1px solid transparent; transition:all 0.18s;">
+          <i class="fas fa-layer-group" style="margin-left:5px;"></i> دمج
+        </button>
+      </div>
+      <div style="font-size:0.72rem; color:var(--text3); margin-bottom:10px; padding:7px 12px; border-radius:9px; background:rgba(16,185,129,0.04); border:1px solid rgba(16,185,129,0.15);">
+        <i class="fas fa-info-circle" style="color:var(--green); margin-left:5px;"></i>
+        <span id="excelModeDescText">تحديث: يحذف المنتجات القديمة ويستبدلها بالجديدة</span>
+      </div>
+      <div style="margin-bottom:10px;">
+        <button id="processExcelBtn" class="btn btn-green" style="width:100%;"><i class="fas fa-play" style="margin-left:6px;"></i> معالجة ورفع المنتجات</button>
+      </div>
+      <div id="excel-upload-status" style="font-size:12px;color:var(--text2);text-align:center;margin-top:6px;"></div>
     </div>
 
+    <!-- رفع ملف الرصيد — نفس أسلوب ملف الجرد -->
     <div class="form-card">
-      <div class="form-title">📦 رفع ملف رصيد Excel</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.6">
-        يدعم ملف <strong>Dynamics</strong> مباشرةً (عمود الفعلي النهائي تلقائياً)<br>
-        أو ملف بسيط: <strong>العمود A</strong> رقم الصنف | <strong>العمود B</strong> الكمية
+      <div style="font-weight:700; margin-bottom:12px; font-size:0.9rem; display:flex; align-items:center; gap:8px;">
+        <i class="fas fa-file-excel" style="color:var(--green);"></i> رفع ملف الرصيد الفعلي (مرجع)
       </div>
-      <div class="upload-area" id="stock-upload-area">
-        <div class="upload-icon">📦</div>
-        <div class="upload-text" id="stock-upload-text">انقر لاختيار ملف الرصيد</div>
-        <div class="upload-hint">يدعم .xlsx و .xls — ستختار الأعمدة بعد الرفع</div>
-        <input type="file" id="stock-file" accept=".xlsx,.xlsm,.xls" style="display:none">
+      <div class="file-label" id="stockUploadArea2"><i class="fas fa-upload"></i> اختر ملف Excel <input type="file" id="stockFileInput2" accept=".xlsx,.xlsm,.xls" style="display:none;"></div>
+      <div style="display:flex; gap:6px; margin-bottom:8px; background:var(--bg); border-radius:12px; padding:5px;">
+        <button id="stockModeUpdate2" style="flex:1; border:none; padding:9px 8px; border-radius:9px; font-size:0.8rem; font-weight:700; cursor:pointer; font-family:inherit; background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.12)); color:var(--green); border:1px solid rgba(16,185,129,0.3); transition:all 0.18s;">
+          <i class="fas fa-sync-alt" style="margin-left:5px;"></i> تحديث
+        </button>
+        <button id="stockModeMerge2" style="flex:1; border:none; padding:9px 8px; border-radius:9px; font-size:0.8rem; font-weight:700; cursor:pointer; font-family:inherit; background:transparent; color:var(--text2); border:1px solid transparent; transition:all 0.18s;">
+          <i class="fas fa-layer-group" style="margin-left:5px;"></i> دمج
+        </button>
       </div>
-      <button class="btn btn-green" id="stock-process-btn" onclick="processStockFile()" style="display:none;width:100%;margin-top:10px">📤 رفع الملف المختار</button>
-      <div id="stock-status" style="margin-top:10px;font-size:12px;color:var(--text2);text-align:center"></div>
+      <div style="font-size:0.72rem; color:var(--text3); margin-bottom:10px; padding:7px 12px; border-radius:9px; background:rgba(16,185,129,0.04); border:1px solid rgba(16,185,129,0.15);">
+        <i class="fas fa-info-circle" style="color:var(--green); margin-left:5px;"></i>
+        <span id="stockModeDescText2">تحديث: يحذف بيانات المرجع القديمة ويستبدلها بالجديدة</span>
+      </div>
+      <button id="processStockBtn2" class="btn btn-green" style="width:100%;margin-bottom:12px;"><i class="fas fa-play" style="margin-left:6px;"></i> معالجة ورفع المرجع</button>
+      <div id="stock-upload-status2" style="font-size:12px;color:var(--text2);text-align:center;margin-top:6px;"></div>
     </div>
 
     <div class="form-card">
@@ -305,65 +339,27 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
   </div>
 </div>
 
-<!-- Column Mapping Modal — Products -->
-<div class="modal-overlay" id="col-map-modal" onclick="if(event.target===this)closeColMap()">
-  <div class="col-map-modal">
-    <button class="modal-close" onclick="closeColMap()">✕</button>
-    <div class="col-map-title">📊 تعيين أعمدة ملف المنتجات</div>
-    <div class="col-map-subtitle">اختر العمود المقابل لكل حقل من ملفك. صف المعاينة من الملف الفعلي.</div>
-    <div class="col-map-preview" id="col-map-preview-tbl"></div>
-    <div class="col-map-row">
-      <span class="col-map-label"><span class="col-map-required">*</span> الباركود</span>
-      <select class="col-map-select" id="cmap-barcode"></select>
+<!-- Column Mapping Modal — نفس أسلوب ملف الجرد -->
+<div id="colMapModal2" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);justify-content:center;align-items:flex-start;z-index:5000;padding:10px;overflow-y:auto;">
+  <div style="background:var(--card);border-radius:24px;padding:24px 20px 20px;width:100%;max-width:520px;border:1px solid rgba(16,185,129,0.3);box-shadow:0 30px 80px rgba(0,0,0,0.8);position:relative;margin:20px auto;">
+    <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--green),var(--green-dark,#059669));border-radius:24px 24px 0 0;"></div>
+    <h3 id="colMapTitle2" style="color:var(--green);margin-bottom:6px;font-family:inherit;font-size:1.1rem;display:flex;align-items:center;gap:10px;"><i class="fas fa-table-columns"></i> تعيين الأعمدة</h3>
+    <p id="colMapFileName2" style="font-size:0.75rem;color:var(--text2);margin-bottom:15px;padding-bottom:12px;border-bottom:1px solid var(--border);"></p>
+    <div style="margin-bottom:15px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text2);"><i class="fas fa-eye" style="color:var(--green);margin-left:6px;"></i>رؤوس الأعمدة</div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.75rem;color:var(--text2);">
+          <span>بدون رؤوس</span>
+          <input type="checkbox" id="colMapNoHeader2" style="width:18px;height:18px;accent-color:var(--green);cursor:pointer;">
+        </label>
+      </div>
+      <div id="colMapPreview2" style="display:flex;flex-wrap:wrap;gap:6px;padding:12px;background:var(--bg);border-radius:12px;max-height:100px;overflow-y:auto;"></div>
     </div>
-    <div class="col-map-row">
-      <span class="col-map-label"><span class="col-map-required">*</span> رقم الصنف</span>
-      <select class="col-map-select" id="cmap-code"></select>
+    <div id="colMapFields2" style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;"></div>
+    <div style="display:flex;gap:12px;">
+      <button id="colMapConfirmBtn2" class="btn btn-green" style="flex:2;font-size:0.95rem;padding:14px;"><i class="fas fa-check-circle" style="margin-left:6px;"></i> تأكيد ومعالجة</button>
+      <button id="colMapCancelBtn2" class="btn btn-outline" style="flex:1;font-size:0.95rem;padding:14px;">إلغاء</button>
     </div>
-    <div class="col-map-row">
-      <span class="col-map-label"><span class="col-map-required">*</span> اسم المنتج</span>
-      <select class="col-map-select" id="cmap-name"></select>
-    </div>
-    <div class="col-map-row">
-      <span class="col-map-label"><span class="col-map-required">*</span> السعر الأصلي</span>
-      <select class="col-map-select" id="cmap-orig"></select>
-    </div>
-    <div class="col-map-row">
-      <span class="col-map-label"><span class="col-map-required">*</span> السعر بعد الخصم</span>
-      <select class="col-map-select" id="cmap-sale"></select>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn btn-green" onclick="confirmColMap()">✅ تأكيد ورفع</button>
-      <button class="btn btn-outline btn-sm" onclick="closeColMap()">إلغاء</button>
-    </div>
-    <div id="col-map-error" style="margin-top:8px;font-size:12px;color:var(--red);text-align:center;display:none"></div>
-  </div>
-</div>
-
-<!-- Column Mapping Modal — Stock -->
-<div class="modal-overlay" id="stk-map-modal" onclick="if(event.target===this)closeStkMap()">
-  <div class="col-map-modal">
-    <button class="modal-close" onclick="closeStkMap()">✕</button>
-    <div class="col-map-title">📦 تعيين أعمدة ملف الرصيد</div>
-    <div class="col-map-subtitle">اختر العمود المقابل لكل حقل من ملفك. صف المعاينة من الملف الفعلي.</div>
-    <div class="col-map-preview" id="stk-map-preview-tbl"></div>
-    <div class="col-map-row">
-      <span class="col-map-label"><span class="col-map-required">*</span> رقم الصنف</span>
-      <select class="col-map-select" id="smap-code"></select>
-    </div>
-    <div class="col-map-row">
-      <span class="col-map-label">اسم الصنف</span>
-      <select class="col-map-select" id="smap-name"></select>
-    </div>
-    <div class="col-map-row">
-      <span class="col-map-label"><span class="col-map-required">*</span> الرصيد (الفعلي النهائي)</span>
-      <select class="col-map-select" id="smap-qty"></select>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn btn-green" onclick="confirmStkMap()">✅ تأكيد ورفع</button>
-      <button class="btn btn-outline btn-sm" onclick="closeStkMap()">إلغاء</button>
-    </div>
-    <div id="stk-map-error" style="margin-top:8px;font-size:12px;color:var(--red);text-align:center;display:none"></div>
   </div>
 </div>
 
@@ -395,6 +391,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
   </div>
 </div>
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
@@ -958,420 +955,6 @@ function showSuccess() {
 }
 
 // ===== Column Mapping — Products =====
-let _pendingExcelRows = null;
-
-function buildColOptions(selId, headers, defaultIdx) {
-  const sel = document.getElementById(selId);
-  sel.innerHTML = '';
-  headers.forEach((h, i) => {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = `عمود ${String.fromCharCode(65+i)} — ${h || '(فارغ)'}`;
-    sel.appendChild(opt);
-  });
-  sel.value = (defaultIdx !== undefined && defaultIdx < headers.length) ? defaultIdx : 0;
-}
-
-function buildPreviewTable(rows, containerId, maxCols) {
-  const preview = rows.slice(0, 4);
-  const cols = maxCols || (preview[0] ? preview[0].length : 0);
-  let html = '<table><tr>';
-  for (let c = 0; c < cols; c++) html += `<th>${String.fromCharCode(65+c)}</th>`;
-  html += '</tr>';
-  preview.forEach(row => {
-    html += '<tr>';
-    for (let c = 0; c < cols; c++) html += `<td>${row[c] !== undefined && row[c] !== '' ? String(row[c]).substring(0,18) : '—'}</td>`;
-    html += '</tr>';
-  });
-  html += '</table>';
-  document.getElementById(containerId).innerHTML = html;
-}
-
-function readFileRobust(file) {
-  function cloneToBlob(f) {
-    return new Promise((res) => {
-      const r = new FileReader();
-      r.onload = e => res(new Blob([e.target.result], { type: 'application/octet-stream' }));
-      r.onerror = () => res(f);
-      r.readAsArrayBuffer(f);
-    });
-  }
-  return cloneToBlob(file).then(blob => new Promise((resolve, reject) => {
-    function tryRead(src, method) {
-      const reader = new FileReader();
-      reader.onload  = e => resolve(e.target.result);
-      reader.onerror = () => {
-        if (method === 'buffer') tryRead(src, 'binary');
-        else if (method === 'binary') tryRead(src, 'url');
-        else if (src !== file) tryRead(file, 'buffer');
-        else reject(new Error('تعذّر قراءة الملف'));
-      };
-      if (method === 'buffer') reader.readAsArrayBuffer(src);
-      else if (method === 'binary') reader.readAsBinaryString(src);
-      else reader.readAsDataURL(src);
-    }
-    tryRead(blob, 'buffer');
-  })).then(result => {
-    if (result instanceof ArrayBuffer) return { data: new Uint8Array(result), type: 'array' };
-    if (typeof result === 'string' && result.startsWith('data:')) return { data: result.split(',')[1], type: 'base64' };
-    return { data: result, type: 'binary' };
-  });
-}
-
-function parseWorkbook(data, type) {
-  const optionSets = [
-    { cellDates: true,  dense: false, bookVBA: false },
-    { cellDates: false, dense: false, bookVBA: false },
-    { raw: true,        dense: false, bookVBA: false },
-    { raw: true,        dense: false, bookVBA: true  },
-  ];
-  let lastErr;
-  for (const opts of optionSets) {
-    try {
-      const wb = XLSX.read(data, { ...opts, type });
-      if (wb && wb.SheetNames && wb.SheetNames.length) return wb;
-    } catch(e) { lastErr = e; }
-  }
-  throw lastErr || new Error('فشلت قراءة الملف');
-}
-
-let _pendingExcelFile = null;
-let _pendingStockFile = null;
-
-function handleExcelUpload(event) {
-  _pendingExcelFile = event.target.files[0];
-  if (!_pendingExcelFile) return;
-  document.getElementById('excel-upload-text').textContent = '✅ ' + _pendingExcelFile.name;
-  document.getElementById('excel-process-btn').style.display = 'block';
-}
-
-async function processExcelFile() {
-  const file = _pendingExcelFile;
-  if (!file) return;
-  const status = document.getElementById('upload-status');
-  status.textContent = '⏳ جاري قراءة الملف...';
-  try {
-    const { data, type } = await readFileRobust(file);
-    const wb   = parseWorkbook(data, type);
-    const ws   = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-    if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
-    _pendingExcelRows = rows;
-
-    const firstRow = rows[0].map(h => String(h).trim());
-    const maxCols  = Math.min(firstRow.length, 26);
-
-    buildPreviewTable(rows, 'col-map-preview-tbl', maxCols);
-
-    // ===== اكتشاف ذكي للأعمدة =====
-    function detectCol(keywords, fallback) {
-      const idx = firstRow.findIndex(h =>
-        keywords.some(kw => h.includes(kw))
-      );
-      return idx >= 0 ? idx : fallback;
-    }
-
-    const autoBarcode = detectCol(['باركود','barcode','كود','رمز'], 0);
-    const autoCode    = detectCol(['رقم الصنف','رقم صنف','كود الصنف','item','sku','رقم المنتج'], autoBarcode === 0 ? 1 : 0);
-    const autoName    = detectCol(['اسم الصنف','اسم المنتج','اسم','name','وصف','description'], 2);
-    const autoOrig    = detectCol(['سعر أساسي','السعر الأساسي','سعر قبل','original','list price','سعر البيع'], 3);
-    const autoSale    = detectCol(['سعر بعد الخصم','سعر الخصم','بعد الخصم','sale','discounted','صافي'], autoOrig + 1 < firstRow.length ? autoOrig + 1 : autoOrig);
-
-    buildColOptions('cmap-barcode', firstRow, autoBarcode);
-    buildColOptions('cmap-code',    firstRow, autoCode);
-    buildColOptions('cmap-name',    firstRow, autoName);
-    buildColOptions('cmap-orig',    firstRow, autoOrig);
-    buildColOptions('cmap-sale',    firstRow, autoSale);
-
-    // إذا اكتُشفت كل الأعمدة المطلوبة تلقائياً — تخطّ المودال وارفع مباشرة
-    const allDetected = [autoCode, autoName, autoOrig, autoSale].every(i => i >= 0 && i < firstRow.length);
-    const headersLookValid = firstRow.some(h => h.length > 1); // صف الرأس يحتوي نصاً
-    if (allDetected && headersLookValid) {
-      // أظهر المودال لثانية واحدة فقط للتأكيد البصري ثم ارفع تلقائياً
-      document.getElementById('col-map-error').style.display = 'none';
-      document.getElementById('col-map-modal').classList.add('open');
-      // رسالة تأكيد
-      const errEl = document.getElementById('col-map-error');
-      errEl.style.color = 'var(--green)';
-      errEl.style.display = 'block';
-      errEl.textContent = '✅ تم اكتشاف الأعمدة تلقائياً — يمكنك تعديلها أو الضغط تأكيد مباشرة';
-    } else {
-      document.getElementById('col-map-error').style.display = 'none';
-      document.getElementById('col-map-modal').classList.add('open');
-    }
-    status.textContent = '';
-    document.getElementById('excel-file').value = '';
-  } catch(e) {
-    status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
-  }
-}
-
-function closeColMap() {
-  document.getElementById('col-map-modal').classList.remove('open');
-  const errEl = document.getElementById('col-map-error');
-  errEl.style.color = 'var(--red)';
-  errEl.style.display = 'none';
-  _pendingExcelRows = null;
-  _pendingExcelFile = null;
-  document.getElementById('excel-process-btn').style.display = 'none';
-  document.getElementById('excel-upload-text').textContent = 'انقر لاختيار ملف Excel الأسعار';
-}
-
-function confirmColMap() {
-  const rows = _pendingExcelRows;
-  if (!rows) return;
-  const colB = parseInt(document.getElementById('cmap-barcode').value);
-  const colC = parseInt(document.getElementById('cmap-code').value);
-  const colN = parseInt(document.getElementById('cmap-name').value);
-  const colO = parseInt(document.getElementById('cmap-orig').value);
-  const colS = parseInt(document.getElementById('cmap-sale').value);
-
-  const errEl = document.getElementById('col-map-error');
-  if ([colC, colN, colO, colS].some(isNaN)) {
-    errEl.textContent = '⚠️ يرجى اختيار جميع الأعمدة الإلزامية'; errEl.style.display='block'; return;
-  }
-  errEl.style.display = 'none';
-
-  const status = document.getElementById('upload-status');
-  let countNew = 0, countUpdated = 0, countSkipped = 0;
-
-  // تخطّ الصف الأول (رأس) إذا كان نصياً
-  const startRow = isNaN(parseFloat(rows[0][colO])) ? 1 : 0;
-
-  rows.forEach((row, ri) => {
-    if (ri < startRow) return;
-
-    // تنظيف الباركود — يمكن أن يكون فارغاً
-    const b = String(row[colB] !== undefined && row[colB] !== null ? row[colB] : '').trim().replace(/\.0+$/, '');
-    const c = String(row[colC] !== undefined && row[colC] !== null ? row[colC] : '').trim().replace(/\.0+$/, '');
-    const n = String(row[colN] !== undefined && row[colN] !== null ? row[colN] : '').trim();
-    const oRaw = parseFloat(row[colO]);
-    const o = isNaN(oRaw) ? 0 : oRaw;
-    const sRaw = parseFloat(row[colS]);
-    const s = (!isNaN(sRaw) && sRaw > 0) ? sRaw : o;
-
-    // تخطّ الصف فقط إذا كان فارغاً تماماً (لا باركود ولا رقم صنف ولا اسم)
-    if (!b && !c && !n) { countSkipped++; return; }
-
-    // إذا لا يوجد رقم صنف استخدم الباركود كمعرّف
-    const key = c || b;
-    const displayName = n || key;
-
-    const d = o > 0 && s < o ? Math.round((o - s) / o * 100) : 0;
-    const existIdx = CODE_MAP[key];
-
-    if (existIdx !== undefined) {
-      // المنتج موجود — حدّث الأسعار واحتفظ بالرصيد والاسم القديم
-      const prev = PRODUCTS[existIdx];
-      const prevStk = prev[5];
-      const updatedName = displayName || prev[1];
-      PRODUCTS[existIdx] = [key, updatedName, o, s, d, prevStk];
-      if (b && BARCODE_MAP[b] === undefined) BARCODE_MAP[b] = existIdx;
-      const prevLocal = LOCAL_PRODUCTS[key] || {};
-      const prevBarcodes = Array.isArray(prevLocal.barcodes) ? prevLocal.barcodes : (prevLocal.b ? [prevLocal.b] : []);
-      if (b && !prevBarcodes.includes(b)) prevBarcodes.push(b);
-      // إزالة علامة noPrice عند اكتمال البيانات
-      const { noPrice: _, ...restLocal } = prevLocal;
-      LOCAL_PRODUCTS[key] = { ...restLocal, c: key, n: updatedName, o, s, d, stk: prevStk, barcodes: prevBarcodes };
-      countUpdated++;
-    } else {
-      // منتج جديد — أضفه كاملاً
-      const idx = PRODUCTS.length;
-      CODE_MAP[key] = idx;
-      PRODUCTS.push([key, displayName, o, s, d, undefined]);
-      if (b) BARCODE_MAP[b] = idx;
-      LOCAL_PRODUCTS[key] = { c: key, n: displayName, o, s, d, barcodes: b ? [b] : [] };
-      countNew++;
-    }
-  });
-
-  // حفظ جميع المنتجات في localStorage بعد التحديث
-  // (ليس LOCAL_PRODUCTS فقط — بل كل PRODUCTS لضمان التحديث الكامل)
-  const allToSave = {};
-  PRODUCTS.forEach((p, i) => {
-    const c = p[0];
-    const existing = LOCAL_PRODUCTS[c] || {};
-    // احتفظ بالباركودات القديمة
-    const barcodes = Array.isArray(existing.barcodes) ? existing.barcodes : (existing.b ? [existing.b] : []);
-    allToSave[c] = {
-      c,
-      n: p[1],
-      o: p[2],
-      s: p[3],
-      d: p[4],
-      stk: p[5],
-      barcodes,
-      ...(existing.noPrice && (p[2] === 0) ? { noPrice: true } : {})
-    };
-  });
-  LOCAL_PRODUCTS = allToSave;
-  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
-
-  const total = countNew + countUpdated;
-  let msg = `<span style="color:var(--green)">✅ تم تحميل ${total.toLocaleString('ar')} منتج</span>`;
-  if (countNew > 0 && countUpdated > 0) msg = `<span style="color:var(--green)">✅ ${countUpdated.toLocaleString('ar')} محدّث — ➕ ${countNew.toLocaleString('ar')} جديد</span>`;
-  if (countSkipped > 0) msg += ` — <span style="color:var(--text3)">${countSkipped.toLocaleString('ar')} تم تخطيه</span>`;
-  status.innerHTML = msg;
-  closeColMap();
-}
-
-
-
-// ===== Column Mapping — Stock =====
-let _pendingStockRows = null;
-
-function handleStockUpload(event) {
-  _pendingStockFile = event.target.files[0];
-  if (!_pendingStockFile) return;
-  document.getElementById('stock-upload-text').textContent = '✅ ' + _pendingStockFile.name;
-  document.getElementById('stock-process-btn').style.display = 'block';
-}
-
-async function processStockFile() {
-  const file = _pendingStockFile;
-  if (!file) return;
-  const status = document.getElementById('stock-status');
-  status.textContent = '⏳ جاري قراءة الملف...';
-  try {
-    const { data, type } = await readFileRobust(file);
-    const wb   = parseWorkbook(data, type);
-    const ws   = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-    if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
-    _pendingStockRows = rows;
-
-    const firstRow = rows[0].map(h => String(h).trim());
-    const maxCols  = Math.min(firstRow.length, 26);
-
-    buildPreviewTable(rows, 'stk-map-preview-tbl', maxCols);
-
-    function detectStkCol(keywords, fallback) {
-      const idx = firstRow.findIndex(h => keywords.some(kw => h.includes(kw)));
-      return idx >= 0 ? idx : fallback;
-    }
-
-    const sAutoCode = detectStkCol(['رقم الصنف','رقم صنف','كود','sku','item'], 0);
-    const sAutoName = detectStkCol(['اسم الصنف','اسم المنتج','اسم','name','وصف'], sAutoCode === 0 ? 1 : 0);
-    const sAutoQty  = detectStkCol(['فعلي نهائي','الفعلي النهائي','رصيد','كمية','stock','qty','quantity','مخزون'], 2);
-
-    buildColOptions('smap-code', firstRow, sAutoCode);
-    buildColOptions('smap-name', firstRow, sAutoName);
-    buildColOptions('smap-qty',  firstRow, sAutoQty);
-
-    const sAllDetected = [sAutoCode, sAutoQty].every(i => i >= 0 && i < firstRow.length);
-    const sErrEl = document.getElementById('stk-map-error');
-    sErrEl.style.display = 'none';
-    document.getElementById('stk-map-modal').classList.add('open');
-    if (sAllDetected && firstRow.some(h => h.length > 1)) {
-      sErrEl.style.color = 'var(--green)';
-      sErrEl.style.display = 'block';
-      sErrEl.textContent = '✅ تم اكتشاف الأعمدة تلقائياً — يمكنك تعديلها أو الضغط تأكيد مباشرة';
-    }
-    status.textContent = '';
-    document.getElementById('stock-file').value = '';
-  } catch(e) {
-    status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${e.message}</span>`;
-  }
-}
-
-function closeStkMap() {
-  document.getElementById('stk-map-modal').classList.remove('open');
-  const sErrEl = document.getElementById('stk-map-error');
-  sErrEl.style.color = 'var(--red)';
-  sErrEl.style.display = 'none';
-  _pendingStockRows = null;
-  _pendingStockFile = null;
-  document.getElementById('stock-process-btn').style.display = 'none';
-  document.getElementById('stock-upload-text').textContent = 'انقر لاختيار ملف الرصيد';
-}
-
-function confirmStkMap() {
-  const rows = _pendingStockRows;
-  if (!rows) return;
-  const colCode = parseInt(document.getElementById('smap-code').value);
-  const colName = parseInt(document.getElementById('smap-name').value);
-  const colQty  = parseInt(document.getElementById('smap-qty').value);
-  const errEl   = document.getElementById('stk-map-error');
-  if (isNaN(colCode) || isNaN(colQty)) {
-    errEl.textContent = '⚠️ يرجى اختيار الأعمدة'; errEl.style.display = 'block'; return;
-  }
-  errEl.style.display = 'none';
-
-  const stockData = {};
-  let updated = 0, notFound = 0, skipped = 0;
-  const startRow = isNaN(Number(rows[0][colQty])) ? 1 : 0;
-
-  // أولاً: اقرأ كل الصفوف الصالحة وابنِ stockData
-  rows.forEach((row, ri) => {
-    if (ri < startRow) return;
-    const c = String(row[colCode] !== undefined && row[colCode] !== null ? row[colCode] : '')
-                .trim().replace(/\.0+$/, '');
-    if (!c) return;
-    const rawQty = row[colQty];
-    if (rawQty === '' || rawQty === null || rawQty === undefined) return;
-    const qty = Number(rawQty);
-    if (isNaN(qty)) return;
-    stockData[c] = qty;
-  });
-
-  // ثانياً: صفّر فقط المنتجات الموجودة في PRODUCTS (وليس الجديدة)
-  PRODUCTS.forEach((p, i) => {
-    PRODUCTS[i][5] = 0;
-    if (LOCAL_PRODUCTS[p[0]]) LOCAL_PRODUCTS[p[0]].stk = 0;
-  });
-
-  // ثالثاً: طبّق stockData
-  rows.forEach((row, ri) => {
-    if (ri < startRow) return;
-    const c = String(row[colCode] !== undefined && row[colCode] !== null ? row[colCode] : '')
-                .trim().replace(/\.0+$/, '');
-    if (!c) { skipped++; return; }
-    const rawQty = row[colQty];
-    if (rawQty === '' || rawQty === null || rawQty === undefined) { skipped++; return; }
-    const qty = Number(rawQty);
-    if (isNaN(qty)) { skipped++; return; }
-
-    const n = (!isNaN(colName) && row[colName] !== undefined)
-              ? String(row[colName]).trim() : '';
-
-    stockData[c] = qty;
-    const idx = CODE_MAP[c];
-    if (idx !== undefined) {
-      PRODUCTS[idx][5] = qty;
-      // حدّث الاسم إذا كان مؤقتاً (noPrice) وجاء اسم من الملف
-      if (n && LOCAL_PRODUCTS[c] && LOCAL_PRODUCTS[c].noPrice) {
-        PRODUCTS[idx][1] = n;
-        LOCAL_PRODUCTS[c].n = n;
-      }
-      if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = qty;
-      else LOCAL_PRODUCTS[c] = { c, stk: qty };
-      updated++;
-    } else {
-      // منتج غير موجود في الأسعار — أضفه باسمه ورصيده، السعر صفر مؤقتاً
-      const displayName = n || c;
-      const newIdx = PRODUCTS.length;
-      CODE_MAP[c] = newIdx;
-      PRODUCTS.push([c, displayName, 0, 0, 0, qty]);
-      LOCAL_PRODUCTS[c] = { c, n: displayName, o: 0, s: 0, d: 0, stk: qty, barcodes: [], noPrice: true };
-      stockData[c] = qty;
-      notFound++;
-    }
-  });
-
-  // مزامنة LOCAL_PRODUCTS مع PRODUCTS بعد تحديث الرصيد
-  PRODUCTS.forEach(p => {
-    const c = p[0];
-    if (!LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c] = { c, n: p[1], o: p[2], s: p[3], d: p[4], barcodes: [] };
-    LOCAL_PRODUCTS[c].stk = p[5];
-  });
-  localStorage.setItem('stock_data', JSON.stringify(stockData));
-  localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
-  const status = document.getElementById('stock-status');
-  status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>`
-    + (notFound ? ` — <span style="color:#1a4fa8">➕ ${notFound.toLocaleString('ar')} منتج جديد أُضيف من الرصيد</span>` : '');
-  closeStkMap();
-}
-
 
 
 // Reset
@@ -1593,10 +1176,324 @@ function exportData() {
   XLSX.writeFile(wb, 'الأنصاري_الأسعار_والمخزون.xlsx');
 }
 
-document.getElementById('excel-upload-area').addEventListener('click', () => document.getElementById('excel-file').click());
-document.getElementById('stock-upload-area').addEventListener('click', () => document.getElementById('stock-file').click());
-document.getElementById('excel-file').addEventListener('change', handleExcelUpload);
-document.getElementById('stock-file').addEventListener('change', handleStockUpload);
+
+// ══════════════════════════════════════════════
+//  كود رفع الملفات — مستخرج من ملف الجرد ومُكيَّف
+// ══════════════════════════════════════════════
+
+// Web Worker لقراءة Excel بدون تجميد الواجهة
+const _xlsxWorkerSrc2 = `
+    importScripts('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    self.onmessage = function(e) {
+        try {
+            const wb = XLSX.read(new Uint8Array(e.data.buf), { type: 'array', cellDates: false });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false });
+            self.postMessage({ rows });
+        } catch(err) {
+            self.postMessage({ error: err.message });
+        }
+    };
+`;
+const _xlsxWorkerBlob2 = new Blob([_xlsxWorkerSrc2], { type: 'application/javascript' });
+const _xlsxWorkerUrl2  = URL.createObjectURL(_xlsxWorkerBlob2);
+
+function readExcelFile2(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const buf = e.target.result;
+            const worker = new Worker(_xlsxWorkerUrl2);
+            worker.onmessage = (ev) => {
+                worker.terminate();
+                if (ev.data.error) reject(new Error(ev.data.error));
+                else resolve(ev.data.rows);
+            };
+            worker.onerror = (err) => { worker.terminate(); reject(err); };
+            worker.postMessage({ buf }, [buf]);
+        };
+        reader.onerror = () => reject(new Error('تعذّر قراءة الملف'));
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+// عرض modal تعيين الأعمدة — نفس منطق ملف الجرد
+function showColMapModal2(title, fileName, fileForHeaders, fields, onConfirm) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        try {
+            const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
+            const chk = document.getElementById('colMapNoHeader2');
+            chk.checked = false;
+
+            function buildUI2() {
+                const noHeader = chk.checked;
+                const firstRow = rawRows[0] || [];
+                const hdrs = firstRow.map((h, i) => ({
+                    label: noHeader ? ('عمود ' + (i+1)) : (String(h||'').trim() || ('عمود ' + (i+1))),
+                    idx: i
+                }));
+                document.getElementById('colMapPreview2').innerHTML = hdrs.map(h =>
+                    '<span style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:6px;padding:2px 8px;font-size:0.68rem;color:var(--green);white-space:nowrap;">' + h.label + '</span>'
+                ).join('');
+                const fieldsDiv = document.getElementById('colMapFields2');
+                fieldsDiv.innerHTML = '';
+                fields.forEach(function(f) {
+                    const opts = '<option value="">— اختر العمود —</option>' +
+                        hdrs.map(h => '<option value="' + h.idx + '">' + h.label + '</option>').join('');
+                    fieldsDiv.innerHTML += '<div style="background:var(--bg);border-radius:11px;padding:11px 13px;">' +
+                        '<label style="font-size:0.73rem;font-weight:700;color:' + (f.color||'var(--text2)') + ';display:flex;align-items:center;gap:5px;margin-bottom:6px;">' +
+                        '<i class="' + f.icon + '"></i>' + f.label +
+                        (f.required ? '<span style="color:var(--red);font-size:0.68rem;margin-right:4px;">* مطلوب</span>' : '') +
+                        '</label>' +
+                        '<select id="cmf2_' + f.id + '" style="width:100%;padding:8px 11px;border-radius:9px;background:var(--card);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:0.8rem;">' + opts + '</select>' +
+                        '</div>';
+                });
+                if (!noHeader) {
+                    fields.forEach(function(f) {
+                        const sel = document.getElementById('cmf2_' + f.id);
+                        const match = hdrs.find(h => f.keywords.some(kw => h.label.includes(kw)));
+                        if (match) sel.value = match.idx;
+                    });
+                }
+            }
+
+            document.getElementById('colMapTitle2').innerHTML = '<i class="fas fa-table-columns"></i> ' + title;
+            document.getElementById('colMapFileName2').textContent = 'الملف: ' + fileName;
+            buildUI2();
+            chk.onchange = buildUI2;
+            document.getElementById('colMapModal2').style.display = 'flex';
+
+            document.getElementById('colMapCancelBtn2').onclick = function() {
+                document.getElementById('colMapModal2').style.display = 'none';
+                chk.onchange = null;
+            };
+            document.getElementById('colMapConfirmBtn2').onclick = function() {
+                const result = { noHeader: chk.checked };
+                for (const f of fields) {
+                    const val = document.getElementById('cmf2_' + f.id).value;
+                    if (f.required && val === '') { alert('يرجى اختيار: ' + f.label); return; }
+                    result[f.id] = val === '' ? null : parseInt(val);
+                }
+                document.getElementById('colMapModal2').style.display = 'none';
+                chk.onchange = null;
+                onConfirm(result);
+            };
+        } catch(err) { alert('خطأ في قراءة الملف: ' + err.message); }
+    };
+    reader.onerror = () => alert('تعذّر قراءة الملف');
+    reader.readAsArrayBuffer(fileForHeaders);
+}
+
+// ── وضع رفع الأسعار (تحديث / دمج) ──
+let excelUploadMode = 'update';
+function setExcelMode(mode) {
+    excelUploadMode = mode;
+    const on = 'linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.12))';
+    const btnU = document.getElementById('excelModeUpdate'), btnM = document.getElementById('excelModeMerge');
+    const desc = document.getElementById('excelModeDescText');
+    if (mode === 'update') {
+        btnU.style.background=on; btnU.style.color='var(--green)'; btnU.style.borderColor='rgba(16,185,129,0.3)';
+        btnM.style.background='transparent'; btnM.style.color='var(--text2)'; btnM.style.borderColor='transparent';
+        desc.textContent='تحديث: يحذف المنتجات القديمة ويستبدلها بالجديدة';
+    } else {
+        btnM.style.background=on; btnM.style.color='var(--green)'; btnM.style.borderColor='rgba(16,185,129,0.3)';
+        btnU.style.background='transparent'; btnU.style.color='var(--text2)'; btnU.style.borderColor='transparent';
+        desc.textContent='دمج: يضيف المنتجات الجديدة مع الاحتفاظ بالموجودة';
+    }
+}
+document.getElementById('excelModeUpdate').onclick = () => setExcelMode('update');
+document.getElementById('excelModeMerge').onclick  = () => setExcelMode('merge');
+
+// ── وضع رفع الرصيد ──
+let stockUploadMode2 = 'replace';
+function setStockMode2(mode) {
+    stockUploadMode2 = mode;
+    const on = 'linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.12))';
+    const btnU = document.getElementById('stockModeUpdate2'), btnM = document.getElementById('stockModeMerge2');
+    const desc = document.getElementById('stockModeDescText2');
+    if (mode === 'replace') {
+        btnU.style.background=on; btnU.style.color='var(--green)'; btnU.style.borderColor='rgba(16,185,129,0.3)';
+        btnM.style.background='transparent'; btnM.style.color='var(--text2)'; btnM.style.borderColor='transparent';
+        desc.textContent='تحديث: يحذف بيانات المرجع القديمة ويستبدلها بالجديدة';
+    } else {
+        btnM.style.background=on; btnM.style.color='var(--green)'; btnM.style.borderColor='rgba(16,185,129,0.3)';
+        btnU.style.background='transparent'; btnU.style.color='var(--text2)'; btnU.style.borderColor='transparent';
+        desc.textContent='دمج: يضيف الكميات إلى الرصيد الموجود';
+    }
+}
+document.getElementById('stockModeUpdate2').onclick = () => setStockMode2('replace');
+document.getElementById('stockModeMerge2').onclick  = () => setStockMode2('merge');
+
+// ── رفع ملف الأسعار ──
+let pendingExcelFiles2 = [];
+document.getElementById('excelFileInput').addEventListener('change', (e) => {
+    pendingExcelFiles2 = Array.from(e.target.files);
+    if (pendingExcelFiles2.length) {
+        document.getElementById('excelUploadArea').innerHTML =
+            '<i class="fas fa-check-circle" style="color:var(--green);margin-left:6px;"></i> ' +
+            pendingExcelFiles2.map(f=>f.name).join(', ') +
+            ' <input type="file" id="excelFileInput" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none;" multiple>';
+        // إعادة ربط listener بعد إعادة بناء HTML
+        document.getElementById('excelUploadArea').querySelector('input[type=file]')
+            .addEventListener('change', (ev) => {
+                pendingExcelFiles2 = Array.from(ev.target.files);
+            });
+    }
+});
+document.getElementById('excelUploadArea').addEventListener('click', () =>
+    document.getElementById('excelFileInput').click()
+);
+
+document.getElementById('processExcelBtn').onclick = async function() {
+    if (!pendingExcelFiles2.length) { alert('اختر ملفاً أولاً'); return; }
+    const status = document.getElementById('excel-upload-status');
+    showColMapModal2(
+        'تعيين أعمدة ملف الأسعار',
+        pendingExcelFiles2.map(f=>f.name).join(', '),
+        pendingExcelFiles2[0],
+        [
+            { id: 'barcode', label: 'الباركود',         icon: 'fas fa-barcode', color: 'var(--text2)',  required: false, keywords: ['باركود','barcode','بار','كود'] },
+            { id: 'itemno',  label: 'رقم الصنف',        icon: 'fas fa-hashtag', color: 'var(--green)',  required: false, keywords: ['رقم الصنف','رقم','item','صنف','sku'] },
+            { id: 'name',    label: 'اسم المنتج',       icon: 'fas fa-tag',     color: 'var(--text2)',  required: false, keywords: ['اسم','name','وصف','desc','المادة'] },
+            { id: 'orig',    label: 'السعر الأصلي',     icon: 'fas fa-tag',     color: 'var(--red)',    required: true,  keywords: ['سعر أساسي','السعر الأساسي','سعر قبل','original','list price','سعر البيع'] },
+            { id: 'sale',    label: 'السعر بعد الخصم',  icon: 'fas fa-percent', color: 'var(--green)',  required: false, keywords: ['سعر بعد الخصم','سعر الخصم','بعد الخصم','sale','discounted','صافي'] },
+        ],
+        async function(colMap) {
+            if (colMap.barcode === null && colMap.itemno === null) { alert('يرجى اختيار الباركود أو رقم الصنف'); return; }
+            if (excelUploadMode === 'update') {
+                // حذف المنتجات القديمة
+                PRODUCTS.length = 0;
+                Object.keys(CODE_MAP).forEach(k => delete CODE_MAP[k]);
+                Object.keys(BARCODE_MAP).forEach(k => delete BARCODE_MAP[k]);
+                Object.keys(LOCAL_PRODUCTS).forEach(k => delete LOCAL_PRODUCTS[k]);
+            }
+            status.textContent = '⏳ جاري المعالجة...';
+            let totalAdded = 0;
+            for (let fi = 0; fi < pendingExcelFiles2.length; fi++) {
+                const file = pendingExcelFiles2[fi];
+                try {
+                    status.textContent = `⏳ قراءة: ${file.name}`;
+                    const rows = await readExcelFile2(file);
+                    if (!rows || rows.length < 1) throw new Error('لا توجد بيانات');
+                    const dataRows = colMap.noHeader ? rows : rows.slice(1);
+                    for (const row of dataRows) {
+                        if (!Array.isArray(row)) continue;
+                        const b = colMap.barcode !== null ? String(row[colMap.barcode]||'').trim().replace(/\.0+$/,'') : '';
+                        const c = colMap.itemno  !== null ? String(row[colMap.itemno] ||'').trim().replace(/\.0+$/,'') : '';
+                        const n = colMap.name    !== null ? String(row[colMap.name]   ||'').trim() : '';
+                        const oRaw = parseFloat(row[colMap.orig]); const o = isNaN(oRaw) ? 0 : oRaw;
+                        const sRaw = colMap.sale !== null ? parseFloat(row[colMap.sale]) : NaN;
+                        const s = (!isNaN(sRaw) && sRaw > 0) ? sRaw : o;
+                        const key = c || b;
+                        if (!key) continue;
+                        const d = o > 0 && s < o ? Math.round((o - s) / o * 100) : 0;
+                        const displayName = n || key;
+                        const existIdx = CODE_MAP[key];
+                        if (existIdx !== undefined) {
+                            const prev = PRODUCTS[existIdx];
+                            PRODUCTS[existIdx] = [key, displayName || prev[1], o, s, d, prev[5]];
+                        } else {
+                            CODE_MAP[key] = PRODUCTS.length;
+                            PRODUCTS.push([key, displayName, o, s, d, undefined]);
+                        }
+                        if (b) BARCODE_MAP[b] = CODE_MAP[key];
+                        LOCAL_PRODUCTS[key] = { c: key, n: displayName, o, s, d, barcodes: b ? [b] : [] };
+                        totalAdded++;
+                    }
+                } catch(err) { status.innerHTML = `<span style="color:var(--red)">❌ خطأ في ${file.name}: ${err.message}</span>`; return; }
+            }
+            localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+            status.innerHTML = `<span style="color:var(--green)">✅ تم ${excelUploadMode==='update'?'تحديث':'دمج'} ${totalAdded.toLocaleString('ar')} منتج</span>`;
+            pendingExcelFiles2 = [];
+            renderList();
+        }
+    );
+};
+
+// ── رفع ملف الرصيد ──
+let pendingStockFiles2 = [];
+document.getElementById('stockFileInput2').addEventListener('change', (e) => {
+    pendingStockFiles2 = Array.from(e.target.files);
+    if (pendingStockFiles2.length) {
+        document.getElementById('stockUploadArea2').innerHTML =
+            '<i class="fas fa-check-circle" style="color:var(--green);margin-left:6px;"></i> ' +
+            pendingStockFiles2.map(f=>f.name).join(', ') +
+            ' <input type="file" id="stockFileInput2" accept=".xlsx,.xlsm,.xls" style="display:none;">';
+        document.getElementById('stockUploadArea2').querySelector('input[type=file]')
+            .addEventListener('change', (ev) => { pendingStockFiles2 = Array.from(ev.target.files); });
+    }
+});
+document.getElementById('stockUploadArea2').addEventListener('click', () =>
+    document.getElementById('stockFileInput2').click()
+);
+
+document.getElementById('processStockBtn2').onclick = async function() {
+    if (!pendingStockFiles2.length) { alert('اختر ملفاً أولاً'); return; }
+    const status = document.getElementById('stock-upload-status2');
+    showColMapModal2(
+        'تعيين أعمدة ملف الرصيد',
+        pendingStockFiles2.map(f=>f.name).join(', '),
+        pendingStockFiles2[0],
+        [
+            { id: 'itemno', label: 'رقم الصنف',           icon: 'fas fa-hashtag',     color: 'var(--green)', required: true,  keywords: ['رقم الصنف','رقم','item','code','كود','صنف'] },
+            { id: 'name',   label: 'اسم الصنف',            icon: 'fas fa-tag',         color: 'var(--text2)', required: false, keywords: ['اسم','name','وصف','desc','المادة'] },
+            { id: 'qty',    label: 'الرصيد (الفعلي النهائي)', icon: 'fas fa-layer-group', color: 'var(--green)', required: true,  keywords: ['فعلي نهائي','الفعلي النهائي','رصيد','كمية','qty','quant','count','مخزون','النهائي'] },
+        ],
+        async function(colMap) {
+            status.textContent = '⏳ جاري معالجة الرصيد...';
+            const stockData = {};
+            let updated = 0, added = 0;
+            for (let fi = 0; fi < pendingStockFiles2.length; fi++) {
+                const file = pendingStockFiles2[fi];
+                try {
+                    status.textContent = `⏳ قراءة: ${file.name}`;
+                    const rows = await readExcelFile2(file);
+                    if (!rows || rows.length < 1) throw new Error('لا توجد بيانات');
+                    const dataRows = colMap.noHeader ? rows : rows.slice(1);
+
+                    // تصفير الرصيد الموجود في وضع التحديث
+                    if (stockUploadMode2 === 'replace') {
+                        PRODUCTS.forEach((p, i) => { PRODUCTS[i][5] = 0; });
+                    }
+
+                    for (const row of dataRows) {
+                        if (!Array.isArray(row)) continue;
+                        const c = String(row[colMap.itemno]||'').trim().replace(/\.0+$/,'');
+                        if (!c) continue;
+                        const rawQty = row[colMap.qty];
+                        if (rawQty === '' || rawQty === null || rawQty === undefined) continue;
+                        const qty = Number(rawQty); if (isNaN(qty)) continue;
+                        const n = colMap.name !== null && row[colMap.name] !== undefined ? String(row[colMap.name]).trim() : '';
+                        stockData[c] = stockUploadMode2 === 'merge' ? (stockData[c] || 0) + qty : qty;
+                        const idx = CODE_MAP[c];
+                        if (idx !== undefined) {
+                            PRODUCTS[idx][5] = stockUploadMode2 === 'merge' ? (PRODUCTS[idx][5] || 0) + qty : qty;
+                            if (LOCAL_PRODUCTS[c]) LOCAL_PRODUCTS[c].stk = PRODUCTS[idx][5];
+                            else LOCAL_PRODUCTS[c] = { c, n: n||PRODUCTS[idx][1], o:PRODUCTS[idx][2], s:PRODUCTS[idx][3], d:PRODUCTS[idx][4], stk: qty, barcodes: [] };
+                            updated++;
+                        } else {
+                            const displayName = n || c;
+                            CODE_MAP[c] = PRODUCTS.length;
+                            PRODUCTS.push([c, displayName, 0, 0, 0, qty]);
+                            LOCAL_PRODUCTS[c] = { c, n: displayName, o:0, s:0, d:0, stk:qty, barcodes:[], noPrice:true };
+                            added++;
+                        }
+                    }
+                } catch(err) { status.innerHTML = `<span style="color:var(--red)">❌ خطأ: ${err.message}</span>`; return; }
+            }
+            localStorage.setItem('stock_data', JSON.stringify(stockData));
+            localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
+            status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>` +
+                (added ? ` — <span style="color:#1a4fa8">➕ ${added.toLocaleString('ar')} منتج جديد</span>` : '');
+            pendingStockFiles2 = [];
+            renderList();
+        }
+    );
+};
+
 </script>
 </body>
 </html>
