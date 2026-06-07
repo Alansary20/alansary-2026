@@ -8,7 +8,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1181,7 +1181,7 @@
             <!-- زر إغلاق الكاميرا — يظهر فوق الكاميرا حين تكون نشطة -->
             <!-- نافذة الكاميرا -->
             <div id="cameraDiv" class="camera-wrapper hidden" style="position:relative;">
-                <div id="reader2"></div>
+                <video id="reader2" style="width:100%;height:100%;object-fit:cover;border-radius:16px;" playsinline muted></video>
                 <!-- خط المسح المتحرك -->
                 <div id="scanLine" style="display:none; position:absolute; left:10%; right:10%; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); border-radius:2px; animation:scanAnim 1.8s ease-in-out infinite; top:50%; z-index:10; box-shadow:0 0 10px var(--accent);"></div>
             </div>
@@ -1511,7 +1511,7 @@
                     </div>
                     <!-- نافذة الكاميرا -->
                     <div style="position:relative;border-radius:16px;overflow:hidden;background:#000;width:100%;max-width:340px;margin:0 auto 8px;">
-                        <div id="prices-reader" style="width:100%;height:260px;"></div>
+                        <video id="prices-reader" style="width:100%;height:260px;object-fit:cover;" playsinline muted></video>
                         <!-- خط المسح -->
                         <div id="prices-scan-line" style="position:absolute;left:8%;right:8%;height:2px;background:linear-gradient(90deg,transparent,#f59e0b,transparent);border-radius:2px;animation:scanAnim 1.8s ease-in-out infinite;top:50%;z-index:10;box-shadow:0 0 10px rgba(245,158,11,0.7);pointer-events:none;"></div>
                     </div>
@@ -2369,79 +2369,64 @@
         });
     };
 
-    // ── كاميرا محسّنة ──
+    // ── كاميرا ZXing — تبويب المسح ──
+    let _zxingMain = null;
+    let _zxingMainStream = null;
+
     async function listCameras() {
         try {
-            const devices = await Html5Qrcode.getCameras();
-            availableCameras = devices;
+            const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+            availableCameras = devices.map(d => ({ id: d.deviceId, label: d.label }));
             const select = document.getElementById('cameraSelect');
             select.innerHTML = '<option value="">اختر الكاميرا</option>';
-            devices.forEach((device, idx) => {
+            availableCameras.forEach((device, idx) => {
                 const option = document.createElement('option');
                 option.value = device.id;
                 option.textContent = device.label || `كاميرا ${idx + 1}`;
                 select.appendChild(option);
             });
-            if (devices.length > 0) {
-                // استعادة الكاميرا المحفوظة أولاً
+            if (availableCameras.length > 0) {
                 const savedCamId = await loadSetting('invSelectedCamera', '');
-                let selectedCam = savedCamId
-                    ? devices.find(d => d.id === savedCamId)
-                    : null;
-                // الأولوية: الكاميرا رقم 3 (index 2)، ثم الخلفية، ثم الأخيرة
+                let selectedCam = savedCamId ? availableCameras.find(d => d.id === savedCamId) : null;
                 if (!selectedCam) {
-                    selectedCam = devices[2]   // كاميرا 3
-                        || devices.find(d => /back|rear|خلفية|environment/i.test(d.label))
-                        || devices[devices.length - 1];
+                    selectedCam = availableCameras[2]
+                        || availableCameras.find(d => /back|rear|خلفية|environment/i.test(d.label || ''))
+                        || availableCameras[availableCameras.length - 1];
                 }
                 currentCameraId = selectedCam.id;
                 select.value = currentCameraId;
             }
-            // تحديث select عند التغيير وحفظه
             select.onchange = () => {
                 currentCameraId = select.value;
                 saveSetting('invSelectedCamera', currentCameraId);
             };
-        } catch (err) { console.warn(err); }
+        } catch (err) { console.warn('listCameras:', err); }
     }
 
     async function startCamera(cameraId = null) {
-        if (html5QrScanner) { await html5QrScanner.stop().catch(() => {}); html5QrScanner = null; }
+        await _stopMainZxing();
         scanningActive = false;
         const cameraDiv = document.getElementById('cameraDiv');
-        const scanLine = document.getElementById('scanLine');
+        const scanLine  = document.getElementById('scanLine');
         cameraDiv.classList.remove('hidden');
         setScanStatus('scanning', 'جاري تشغيل الكاميرا...');
         try {
             const targetId = cameraId || currentCameraId || (availableCameras[0]?.id);
-            if (!targetId) throw new Error("لا توجد كاميرا متاحة");
-            html5QrScanner = new Html5Qrcode("reader2");
-            await html5QrScanner.start(
-                { deviceId: { exact: targetId } },
-                {
-                    fps: 30,
-                    disableFlip: false,
-                    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-                    formatsToSupport: [
-                        Html5QrcodeSupportedFormats?.EAN_13,
-                        Html5QrcodeSupportedFormats?.EAN_8,
-                        Html5QrcodeSupportedFormats?.UPC_A,
-                        Html5QrcodeSupportedFormats?.UPC_E,
-                        Html5QrcodeSupportedFormats?.CODE_128,
-                        Html5QrcodeSupportedFormats?.CODE_39,
-                        Html5QrcodeSupportedFormats?.CODE_93,
-                        Html5QrcodeSupportedFormats?.ITF,
-                        Html5QrcodeSupportedFormats?.CODABAR,
-                    ].filter(Boolean)
-                },
-                async (decoded) => {
+            if (!targetId) throw new Error('لا توجد كاميرا متاحة');
+            const videoEl = document.getElementById('reader2');
+            if (!videoEl) throw new Error('عنصر الفيديو غير موجود');
+            _zxingMain = new ZXing.BrowserMultiFormatReader(null, {
+                delayBetweenScanAttempts: 80,
+                delayBetweenScanSuccess: 1200
+            });
+            await _zxingMain.decodeFromVideoDevice(targetId, videoEl, (result, err) => {
+                if (result) {
+                    const decoded = result.getText();
                     onCameraScan(decoded);
-                    // عرض الكود المقروء في الحقل للمراجعة
                     const code = sanitizeBarcode(decoded);
                     if (code) document.getElementById('barcodeInput').value = code;
-                },
-                () => {} // خطأ مسح عادي، تجاهل
-            );
+                }
+            });
             scanningActive = true;
             currentCameraId = targetId;
             if (scanLine) scanLine.style.display = 'block';
@@ -2449,7 +2434,7 @@
             setScanStatus('ready', t('cameraActive'));
             initAudio();
         } catch (err) {
-            showToast(t('cameraError') + err.message, true);
+            showToast(t('cameraError') + ' ' + err.message, true);
             cameraDiv.classList.add('hidden');
             if (scanLine) scanLine.style.display = 'none';
             document.getElementById('closeCamBtn').style.display = 'none';
@@ -2458,8 +2443,21 @@
         }
     }
 
+    async function _stopMainZxing() {
+        if (_zxingMain) {
+            try { _zxingMain.reset(); } catch(e) {}
+            _zxingMain = null;
+        }
+        // أوقف stream مباشرة
+        const vid = document.getElementById('reader2');
+        if (vid && vid.srcObject) {
+            vid.srcObject.getTracks().forEach(t => t.stop());
+            vid.srcObject = null;
+        }
+    }
+
     async function closeCamera() {
-        if (html5QrScanner) { await html5QrScanner.stop().catch(() => {}); html5QrScanner = null; }
+        await _stopMainZxing();
         scanningActive = false;
         document.getElementById('cameraDiv').classList.add('hidden');
         document.getElementById('closeCamBtn').style.display = 'none';
@@ -3494,10 +3492,8 @@
         let target = this.getAttribute('data-tab');
         // أغلق الكاميرا فوراً عند مغادرة تبويب المسح
         if (target !== 'tab-scan') {
-            if (html5QrScanner) {
-                html5QrScanner.stop().catch(() => {});
-                html5QrScanner = null;
-            }
+            // أوقف ZXing الرئيسي
+            if (typeof _stopMainZxing === 'function') _stopMainZxing();
             scanningActive = false;
             const scanLine = document.getElementById('scanLine');
             if (scanLine) scanLine.style.display = 'none';
@@ -4592,14 +4588,14 @@ async function exportPricesData() {
 }
 
 // ══════════════════════════════════════════════════
-//  سكانر كاميرا تبويب الأسعار — نسخة محسّنة
+//  سكانر كاميرا تبويب الأسعار — ZXing
 // ══════════════════════════════════════════════════
-var _pricesCamScanner = null;
-var _pricesCamActive  = false;
-var _pricesCamList    = [];
-var _pricesCurCam     = null;
-var _pricesScanLock   = false;
-var _pricesLastScan   = 0;
+var _zxingPrices     = null;
+var _pricesCamActive = false;
+var _pricesCamList   = [];
+var _pricesCurCam    = null;
+var _pricesScanLock  = false;
+var _pricesLastScan  = 0;
 var PRICES_SCAN_DELAY = 1800;
 
 function _pricesSetStatus(msg) {
@@ -4609,56 +4605,54 @@ function _pricesSetStatus(msg) {
 
 async function _pricesLoadCameras() {
     try {
-        var devices = await Html5Qrcode.getCameras();
-        _pricesCamList = devices;
+        var devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+        _pricesCamList = devices.map(function(d) { return { id: d.deviceId, label: d.label }; });
         var sel = document.getElementById('prices-cam-select');
-        if (!sel || !devices.length) return;
+        if (!sel || !_pricesCamList.length) return;
         sel.innerHTML = '';
-        devices.forEach(function(d, i) {
+        _pricesCamList.forEach(function(d, i) {
             var o = document.createElement('option');
             o.value = d.id;
             o.textContent = d.label || ('كاميرا ' + (i + 1));
             sel.appendChild(o);
         });
-        // تفضيل الكاميرا الخلفية
-        var back = devices.find(function(d) { return /back|rear|environment/i.test(d.label || ''); })
-                   || devices[devices.length - 1];
+        var back = _pricesCamList.find(function(d) { return /back|rear|environment/i.test(d.label || ''); })
+                   || _pricesCamList[_pricesCamList.length - 1];
         _pricesCurCam = back.id;
         sel.value = _pricesCurCam;
         sel.onchange = function() { _pricesCurCam = this.value; };
     } catch(e) { console.warn('prices cameras:', e); }
 }
 
-async function _pricesStartCam(camId) {
-    // أوقف أي كاميرا سابقة
-    if (_pricesCamScanner) {
-        try { await _pricesCamScanner.stop(); } catch(e) {}
-        _pricesCamScanner = null;
+async function _pricesStopZxing() {
+    if (_zxingPrices) {
+        try { _zxingPrices.reset(); } catch(e) {}
+        _zxingPrices = null;
+    }
+    var vid = document.getElementById('prices-reader');
+    if (vid && vid.srcObject) {
+        vid.srcObject.getTracks().forEach(function(t) { t.stop(); });
+        vid.srcObject = null;
     }
     _pricesCamActive = false;
+}
 
+async function _pricesStartCam(camId) {
+    await _pricesStopZxing();
     var targetId = camId || _pricesCurCam || (_pricesCamList[0] && _pricesCamList[0].id);
     if (!targetId) { _pricesSetStatus('❌ لا توجد كاميرا'); return; }
-
-    // تأكد أن prices-reader ظاهر وله ارتفاع
-    var readerEl = document.getElementById('prices-reader');
-    if (!readerEl) { _pricesSetStatus('❌ خطأ في التهيئة'); return; }
-
+    var vid = document.getElementById('prices-reader');
+    if (!vid) { _pricesSetStatus('❌ خطأ في التهيئة'); return; }
     try {
-        _pricesCamScanner = new Html5Qrcode('prices-reader');
-        await _pricesCamScanner.start(
-            { deviceId: { exact: targetId } },
-            {
-                fps: 20,
-                qrbox: { width: 240, height: 180 },
-                disableFlip: false,
-                experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-            },
-            function(decoded) { _pricesOnScan(decoded); },
-            function() {}
-        );
+        _zxingPrices = new ZXing.BrowserMultiFormatReader(null, {
+            delayBetweenScanAttempts: 80,
+            delayBetweenScanSuccess: PRICES_SCAN_DELAY
+        });
+        await _zxingPrices.decodeFromVideoDevice(targetId, vid, function(result, err) {
+            if (result) _pricesOnScan(result.getText());
+        });
         _pricesCamActive = true;
-        _pricesCurCam    = targetId;
+        _pricesCurCam = targetId;
         _pricesSetStatus('🎯 وجّه الكاميرا نحو الباركود');
     } catch(err) {
         _pricesCamActive = false;
@@ -4672,23 +4666,16 @@ function _pricesOnScan(raw) {
     if (_pricesScanLock || now - _pricesLastScan < PRICES_SCAN_DELAY) return;
     _pricesScanLock = true;
     _pricesLastScan = now;
-
     var code = String(raw || '').trim().replace(/\.0+$/, '');
     if (!code) { _pricesScanLock = false; return; }
-
-    // ضع الكود في حقل البحث
     var inp = document.getElementById('prices-search-input');
     if (inp) inp.value = code;
-
-    // حدد نوع البحث تلقائياً
     var isNum = /^\d+$/.test(code);
     if (isNum && priceSearchType !== 'barcode') setPriceSearchType('barcode');
     else if (!isNum && priceSearchType === 'barcode') setPriceSearchType('code');
-
     doPriceSearch();
     _pricesSetStatus('✅ تم مسح: ' + code);
     if (navigator.vibrate) navigator.vibrate(60);
-
     setTimeout(function() {
         _pricesScanLock = false;
         if (_pricesCamActive) _pricesSetStatus('🎯 وجّه الكاميرا نحو الباركود');
@@ -4696,50 +4683,23 @@ function _pricesOnScan(raw) {
 }
 
 async function togglePricesCamera() {
-    if (_pricesCamActive) {
-        await closePricesCamera();
-        return;
-    }
-    // أظهر منطقة الكاميرا أولاً
+    if (_pricesCamActive) { await closePricesCamera(); return; }
     var area = document.getElementById('prices-camera-area');
     if (area) area.style.display = 'block';
-
-    // تحديث زر الكاميرا
     var btn = document.getElementById('prices-cam-btn');
-    if (btn) {
-        btn.style.background = 'linear-gradient(135deg,#dc2626,#ef4444)';
-        btn.innerHTML = '<i class="fas fa-times"></i>';
-    }
-
+    if (btn) { btn.style.background = 'linear-gradient(135deg,#dc2626,#ef4444)'; btn.innerHTML = '<i class="fas fa-times"></i>'; }
     _pricesSetStatus('⏳ جاري تحميل الكاميرا...');
-
-    // حمّل الكاميرات إن لم تكن محمّلة
     if (!_pricesCamList.length) await _pricesLoadCameras();
-
-    // ابدأ الكاميرا بعد تأخير بسيط لضمان ظهور الـ DOM
-    setTimeout(function() { _pricesStartCam(); }, 80);
+    setTimeout(function() { _pricesStartCam(); }, 50);
 }
 
 async function closePricesCamera() {
-    if (_pricesCamScanner) {
-        try { await _pricesCamScanner.stop(); } catch(e) {}
-        _pricesCamScanner = null;
-    }
-    _pricesCamActive = false;
-    _pricesScanLock  = false;
-
+    await _pricesStopZxing();
     var area = document.getElementById('prices-camera-area');
     if (area) area.style.display = 'none';
-
     var btn = document.getElementById('prices-cam-btn');
-    if (btn) {
-        btn.style.background = 'linear-gradient(135deg,#1d4ed8,#3b82f6)';
-        btn.innerHTML = '<i class="fas fa-camera"></i>';
-    }
-
-    // نظّف الـ reader لمنع تكرار الـ element عند الفتح التالي
-    var readerEl = document.getElementById('prices-reader');
-    if (readerEl) readerEl.innerHTML = '';
+    if (btn) { btn.style.background = 'linear-gradient(135deg,#1d4ed8,#3b82f6)'; btn.innerHTML = '<i class="fas fa-camera"></i>'; }
+    _pricesScanLock = false;
 }
 
 async function switchPricesCamera() {
@@ -4752,7 +4712,6 @@ async function switchPricesCamera() {
     if (sel) sel.value = _pricesCurCam;
     await _pricesStartCam(_pricesCurCam);
 }
-
 // ── مزامنة الأسعار من قاعدة بيانات المنتجات والمرجع ──
 async function syncPricesFromDB() {
     const statusEl = document.getElementById('prices-sync-status');
