@@ -283,7 +283,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
       <div style="font-weight:700; margin-bottom:12px; font-size:0.9rem; display:flex; align-items:center; gap:8px;">
         <i class="fas fa-file-excel" style="color:var(--green);"></i> رفع ملف Excel الأسعار
       </div>
-      <div class="file-label" id="excelUploadArea"><span id="excelUploadAreaLabel"><i class="fas fa-upload"></i> رفع ملف المنتجات</span><input type="file" id="excelFileInput" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none;" multiple></div>
+      <label for="excelFileInput" class="file-label" id="excelUploadArea"><span id="excelUploadAreaLabel"><i class="fas fa-upload"></i> رفع ملف المنتجات</span></label>
+      <input type="file" id="excelFileInput" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none;" multiple>
       <div style="display:flex; gap:6px; margin-bottom:8px; background:var(--bg); border-radius:12px; padding:5px;">
         <button id="excelModeUpdate" style="flex:1; border:none; padding:9px 8px; border-radius:9px; font-size:0.8rem; font-weight:700; cursor:pointer; font-family:inherit; background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.12)); color:var(--green); border:1px solid rgba(16,185,129,0.3); transition:all 0.18s;">
           <i class="fas fa-sync-alt" style="margin-left:5px;"></i> تحديث
@@ -307,7 +308,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
       <div style="font-weight:700; margin-bottom:12px; font-size:0.9rem; display:flex; align-items:center; gap:8px;">
         <i class="fas fa-file-excel" style="color:var(--green);"></i> رفع ملف الرصيد الفعلي (مرجع)
       </div>
-      <div class="file-label" id="stockUploadArea2"><span id="stockUploadAreaLabel2"><i class="fas fa-upload"></i> اختر ملف Excel</span><input type="file" id="stockFileInput2" accept=".xlsx,.xlsm,.xls" style="display:none;"></div>
+      <label for="stockFileInput2" class="file-label" id="stockUploadArea2"><span id="stockUploadAreaLabel2"><i class="fas fa-upload"></i> اختر ملف Excel</span></label>
+      <input type="file" id="stockFileInput2" accept=".xlsx,.xlsm,.xls" style="display:none;">
       <div style="display:flex; gap:6px; margin-bottom:8px; background:var(--bg); border-radius:12px; padding:5px;">
         <button id="stockModeUpdate2" style="flex:1; border:none; padding:9px 8px; border-radius:9px; font-size:0.8rem; font-weight:700; cursor:pointer; font-family:inherit; background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.12)); color:var(--green); border:1px solid rgba(16,185,129,0.3); transition:all 0.18s;">
           <i class="fas fa-sync-alt" style="margin-left:5px;"></i> تحديث
@@ -1337,9 +1339,7 @@ document.getElementById('excelFileInput').addEventListener('change', (e) => {
             pendingExcelFiles2.map(f=>f.name).join(', ');
     }
 });
-document.getElementById('excelUploadArea').addEventListener('click', () =>
-    document.getElementById('excelFileInput').click()
-);
+// label for يتولى فتح file picker تلقائياً — لا حاجة لـ .click()
 
 document.getElementById('processExcelBtn').onclick = async function() {
     if (!pendingExcelFiles2.length) { alert('اختر ملفاً أولاً'); return; }
@@ -1402,6 +1402,8 @@ document.getElementById('processExcelBtn').onclick = async function() {
             localStorage.setItem('local_products', JSON.stringify(LOCAL_PRODUCTS));
             status.innerHTML = `<span style="color:var(--green)">✅ تم ${excelUploadMode==='update'?'تحديث':'دمج'} ${totalAdded.toLocaleString('ar')} منتج</span>`;
             pendingExcelFiles2 = [];
+            document.getElementById('excelFileInput').value = '';
+            document.getElementById('excelUploadAreaLabel').innerHTML = '<i class="fas fa-upload"></i> رفع ملف المنتجات';
             renderList();
         }
     );
@@ -1417,9 +1419,7 @@ document.getElementById('stockFileInput2').addEventListener('change', (e) => {
             pendingStockFiles2.map(f=>f.name).join(', ');
     }
 });
-document.getElementById('stockUploadArea2').addEventListener('click', () =>
-    document.getElementById('stockFileInput2').click()
-);
+// label for يتولى فتح file picker تلقائياً — لا حاجة لـ .click()
 
 document.getElementById('processStockBtn2').onclick = async function() {
     if (!pendingStockFiles2.length) { alert('اختر ملفاً أولاً'); return; }
@@ -1480,6 +1480,8 @@ document.getElementById('processStockBtn2').onclick = async function() {
             status.innerHTML = `<span style="color:var(--green)">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>` +
                 (added ? ` — <span style="color:#1a4fa8">➕ ${added.toLocaleString('ar')} منتج جديد</span>` : '');
             pendingStockFiles2 = [];
+            document.getElementById('stockFileInput2').value = '';
+            document.getElementById('stockUploadAreaLabel2').innerHTML = '<i class="fas fa-upload"></i> اختر ملف Excel';
             renderList();
         }
     );
