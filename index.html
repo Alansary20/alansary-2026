@@ -1138,7 +1138,7 @@
         <div class="tabs-row tabs-row-2">
             <button class="tab-btn" data-tab="tab-cmp"><i class="fas fa-chart-line"></i><span data-i18n="tabCmp">المقارنة</span></button>
             <button class="tab-btn" data-tab="tab-products"><i class="fas fa-archive"></i><span data-i18n="tabProducts">المنتجات</span></button>
-            <button class="tab-btn" data-tab="tab-prices"><i class="fas fa-tags"></i><span>الأسعار</span></button>
+            <button class="tab-btn" data-tab="tab-prices"><i class="fas fa-tags"></i><span data-i18n="tabPrices">الأسعار</span></button>
         </div>
     </div>
     <div id="tab-scan" class="panel active-pane">
@@ -1476,12 +1476,12 @@
             <!-- بحث -->
             <div style="margin-bottom:14px;">
                 <div style="font-size:0.9rem;font-weight:700;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-                    <i class="fas fa-tags" style="color:#f59e0b;"></i> بحث الأسعار والأرصدة
+                    <i class="fas fa-tags" style="color:#f59e0b;"></i> <span data-i18n="pricesSearchTitle">بحث الأسعار والأرصدة</span>
                 </div>
                 <div style="display:flex;gap:6px;margin-bottom:8px;">
-                    <button class="prices-stab active" id="pstab-barcode" onclick="setPriceSearchType('barcode')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;">باركود</button>
-                    <button class="prices-stab" id="pstab-code" onclick="setPriceSearchType('code')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;">رقم الصنف</button>
-                    <button class="prices-stab" id="pstab-name" onclick="setPriceSearchType('name')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;">اسم المنتج</button>
+                    <button class="prices-stab active" id="pstab-barcode" onclick="setPriceSearchType('barcode')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;" data-i18n="pstabBarcode">باركود</button>
+                    <button class="prices-stab" id="pstab-code" onclick="setPriceSearchType('code')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;" data-i18n="pstabCode">رقم الصنف</button>
+                    <button class="prices-stab" id="pstab-name" onclick="setPriceSearchType('name')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;" data-i18n="pstabName">اسم المنتج</button>
                 </div>
                 <div style="position:relative;">
                     <input class="input-field" type="text" id="prices-search-input"
@@ -1504,7 +1504,7 @@
 
                 <!-- اختيار الكاميرا -->
                 <div id="ps-cam-row" style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-                    <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap;flex-shrink:0;">📷 الكاميرا:</span>
+                    <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap;flex-shrink:0;" data-i18n="pricesCameraLabel">📷 الكاميرا:</span>
                     <select id="ps-cam-select" onchange="psOnCamChange()"
                         style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:12px;font-family:'Cairo',sans-serif;background:var(--surface2);color:var(--text);outline:none;cursor:pointer;">
                         <option value="">⏳ جاري التحميل...</option>
@@ -1516,10 +1516,10 @@
                 <div style="display:flex;gap:8px;margin-top:8px;">
                     <button id="ps-toggle-btn" onclick="psToggleScanner()"
                         style="flex:1;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;">
-                        <i class="fas fa-camera"></i> تشغيل السكانر
+                        <i class="fas fa-camera"></i> <span data-i18n="pricesStartScanner">تشغيل السكانر</span>
                     </button>
                     <button onclick="psClearSearch()"
-                        style="padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:12px;cursor:pointer;">
+                        style="padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:12px;cursor:pointer;" data-i18n="pricesClear">
                         🗑️ مسح
                     </button>
                 </div>
@@ -1544,15 +1544,16 @@
             <!-- قائمة المنتجات وبحث فيها -->
             <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:14px;">
                 <div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-                    <i class="fas fa-list" style="color:#f59e0b;"></i> قائمة المنتجات
+                    <i class="fas fa-list" style="color:#f59e0b;"></i> <span data-i18n="pricesListTitle">قائمة المنتجات</span>
                     <span id="prices-list-count" style="background:rgba(245,158,11,0.1);color:#f59e0b;border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:1px 10px;font-size:0.75rem;margin-right:4px;">0</span>
                 </div>
                 <input class="input-field search-input" type="text" id="prices-list-search"
+                    data-i18n-placeholder="pricesListSearch"
                     placeholder="🔍 ابحث باسم المنتج أو الصنف أو الباركود..."
                     style="margin-bottom:8px;"
                     oninput="filterPricesList()">
                 <div id="prices-product-list" style="max-height:340px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--surface3) transparent;"></div>
-                <button id="prices-load-more-btn" onclick="loadMorePrices()" style="display:none;width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--accent);font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;">تحميل المزيد</button>
+                <button id="prices-load-more-btn" onclick="loadMorePrices()" style="display:none;width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--accent);font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;" data-i18n="pricesLoadMore">تحميل المزيد</button>
             </div>
         </div>
 
@@ -2994,10 +2995,6 @@
 
 
 
-    // ── تاريخ التصدير ──
-    const _now = new Date();
-    const DATE_STR = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
-
     async function exportStyledExcel({ fileName, sheetName, columns, rows, rowStyle }) {
         // تحقق من تحميل ExcelJS
         if (!window.ExcelJS) {
@@ -3116,11 +3113,19 @@
                 fileName: `منتجات_${DATE_STR}.xlsx`,
                 sheetName: 'المنتجات',
                 columns: [
-                    { header:'الباركود',  key:'barcode', width:22 },
-                    { header:'رقم الصنف', key:'item_no', width:18 },
-                    { header:'الاسم',     key:'name',    width:40 },
+                    { header:'الباركود',    key:'barcode',    width:22 },
+                    { header:'رقم الصنف',   key:'item_no',    width:18 },
+                    { header:'الاسم',       key:'name',       width:40 },
+                    { header:'السعر الأصلي', key:'price_orig', width:16 },
+                    { header:'سعر الخصم',   key:'price_sale', width:16 },
                 ],
-                rows: prods.map(p => ({ barcode: p.barcode||'', item_no: p.item_no||'', name: p.name||'' }))
+                rows: prods.map(p => ({
+                    barcode:    p.barcode    || '',
+                    item_no:    p.item_no    || '',
+                    name:       p.name       || '',
+                    price_orig: parseFloat(p.price_orig) || 0,
+                    price_sale: parseFloat(p.price_sale) || parseFloat(p.price_orig) || 0,
+                }))
             });
             showToast(t('exportedProducts'));
         } catch(err) {
@@ -3333,6 +3338,20 @@
             Promise.all([new Promise(r=>{ tx1.oncomplete=r; }), new Promise(r=>{ tx2.oncomplete=r; })]).then(()=>{ updateAllUI(["prods"]); showToast(t('productsCleared')); });
         });
     };
+    // ── تنزيل ملف ──
+    const DATE_STR = new Date().toLocaleDateString('ar-SA').replace(/\//g, '-');
+
+    function downloadFile(data, fileName, mimeType) {
+        const blob = new Blob([data], { type: mimeType });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    }
+
     // ── شريط التقدم ──
     function showProgress(title, sub, pct) {
         document.getElementById('progressOverlay').classList.add('show');
@@ -3719,6 +3738,37 @@
             stockModeMergeDesc: 'دمج: يجمع الكميات مع المرجع الموجود',
             dbModeUpdateDesc: 'تحديث: يحذف المنتجات القديمة ويستبدلها بالجديدة',
             dbModeMergeDesc: 'دمج: يُضيف المنتجات الجديدة مع الحفاظ على الموجودة',
+            // تبويب الأسعار
+            tabPrices: 'الأسعار',
+            pricesSearchTitle: 'بحث الأسعار والأرصدة',
+            pstabBarcode: 'باركود',
+            pstabCode: 'رقم الصنف',
+            pstabName: 'اسم المنتج',
+            pricesBarcodePlaceholder: 'أدخل الباركود...',
+            pricesCodePlaceholder: 'جزء من رقم الصنف... مثال: 1006',
+            pricesNamePlaceholder: 'ابحث باسم المنتج...',
+            pricesStartScanner: 'تشغيل السكانر',
+            pricesCloseScanner: 'إغلاق الكاميرا',
+            pricesClear: '🗑️ مسح',
+            pricesListTitle: 'قائمة المنتجات',
+            pricesLoadMore: 'تحميل المزيد',
+            pricesListSearch: '🔍 ابحث باسم المنتج أو الصنف أو الباركود...',
+            pricesLoading: '⏳ جاري تحميل البيانات...',
+            pricesFound: '✅ تم العثور على المنتج',
+            pricesNotFound: '❌ لم يُعثر على منتج بهذا الباركود: ',
+            pricesNoResults: 'لا توجد نتائج لـ',
+            pricesResultsCount: 'نتيجة — انقر لعرض التفاصيل',
+            pricesLabelItemNo: '🔢 رقم الصنف',
+            pricesLabelBarcode: '📦 الباركود',
+            pricesLabelOrigPrice: 'السعر الأصلي',
+            pricesLabelSalePrice: 'بعد الخصم',
+            pricesLabelDiscount: 'الخصم',
+            pricesLabelStock: 'الرصيد',
+            pricesLabelPcs: 'قطعة',
+            pricesEditBtn: '✏️ تعديل',
+            pricesEditNote: 'للتعديل استخدم تبويب المنتجات',
+            pricesNoProducts: 'لا توجد منتجات مرفوعة بعد',
+            pricesCameraLabel: '📷 الكاميرا:',
         },
         en: {
             appTitle: 'Smart Inventory System',
@@ -3877,6 +3927,37 @@
             stockModeMergeDesc: 'Merge: combines quantities with existing reference',
             dbModeUpdateDesc: 'Replace: deletes existing products and replaces with new',
             dbModeMergeDesc: 'Merge: adds new products while keeping existing ones',
+            // Prices tab
+            tabPrices: 'Prices',
+            pricesSearchTitle: 'Price & Stock Lookup',
+            pstabBarcode: 'Barcode',
+            pstabCode: 'Item No.',
+            pstabName: 'Product Name',
+            pricesBarcodePlaceholder: 'Enter barcode...',
+            pricesCodePlaceholder: 'Part of item no. e.g. 1006',
+            pricesNamePlaceholder: 'Search by product name...',
+            pricesStartScanner: 'Start Scanner',
+            pricesCloseScanner: 'Close Camera',
+            pricesClear: '🗑️ Clear',
+            pricesListTitle: 'Product List',
+            pricesLoadMore: 'Load More',
+            pricesListSearch: '🔍 Search by name, item no. or barcode...',
+            pricesLoading: '⏳ Loading data...',
+            pricesFound: '✅ Product Found',
+            pricesNotFound: '❌ No product found for barcode: ',
+            pricesNoResults: 'No results for',
+            pricesResultsCount: 'result(s) — tap to view details',
+            pricesLabelItemNo: '🔢 Item No.',
+            pricesLabelBarcode: '📦 Barcode',
+            pricesLabelOrigPrice: 'Original Price',
+            pricesLabelSalePrice: 'Sale Price',
+            pricesLabelDiscount: 'Discount',
+            pricesLabelStock: 'Stock',
+            pricesLabelPcs: 'pcs',
+            pricesEditBtn: '✏️ Edit',
+            pricesEditNote: 'To edit, use the Products tab',
+            pricesNoProducts: 'No products uploaded yet',
+            pricesCameraLabel: '📷 Camera:',
         }
     };
 
@@ -3972,7 +4053,7 @@ async function rebuildPricesIndex() {
         const sale = parseFloat(p.price_sale) || orig;
         const disc = orig > 0 ? Math.round((orig - sale) / orig * 100) : 0;
         const stk  = stockMap[p.item_no] !== undefined ? stockMap[p.item_no]
-                   : stockMap[p.barcode] !== undefined ? stockMap[p.barcode] : null;
+                   : stockMap[p.barcode] !== undefined ? stockMap[p.barcode] : 0;
         const idx  = PR_LIST.length;
         PR_LIST.push([code, name, orig, sale, disc, stk]);
         if (p.item_no)  PR_CODE_MAP[p.item_no]    = idx;
@@ -4019,9 +4100,9 @@ function setPriceSearchType(t) {
     }
     const input = document.getElementById('prices-search-input');
     if (!input) return;
-    if (t === 'barcode') { input.placeholder = 'أدخل الباركود...'; input.inputMode = 'numeric'; }
-    if (t === 'code')    { input.placeholder = 'جزء من رقم الصنف... مثال: 1006'; input.inputMode = 'text'; }
-    if (t === 'name')    { input.placeholder = 'ابحث باسم المنتج...'; input.inputMode = 'text'; }
+    if (t === 'barcode') { input.placeholder = i18n[currentLang]?.pricesBarcodePlaceholder || 'أدخل الباركود...'; input.inputMode = 'numeric'; }
+    if (t === 'code')    { input.placeholder = i18n[currentLang]?.pricesCodePlaceholder    || 'جزء من رقم الصنف...'; input.inputMode = 'text'; }
+    if (t === 'name')    { input.placeholder = i18n[currentLang]?.pricesNamePlaceholder    || 'ابحث باسم المنتج...'; input.inputMode = 'text'; }
     document.getElementById('prices-result-area').innerHTML = '';
 }
 // تهيئة زر الباركود كنشط عند أول تحميل
@@ -4040,7 +4121,7 @@ async function doPriceSearch() {
 
     // تأكد من بناء الفهرس أولاً
     if (!PR_LIST.length) {
-        area.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">⏳ جاري تحميل البيانات...</div>';
+        area.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">' + t('pricesLoading') + '</div>';
         await rebuildPricesIndex();
     }
 
@@ -4048,17 +4129,17 @@ async function doPriceSearch() {
         const idx = PR_BARCODE_MAP[q];
         area.innerHTML = idx !== undefined
             ? renderPriceProduct(PR_LIST[idx])
-            : `<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:12px;color:var(--negative);font-size:13px;text-align:center;">❌ لم يُعثر على منتج بهذا الباركود: ${q}</div>`;
+            : `<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:12px;color:var(--negative);font-size:13px;text-align:center;">❌ ${t('pricesNotFound')}${q}</div>`;
     } else if (priceSearchType === 'code') {
         const ql    = q.toLowerCase();
         const exact = PR_CODE_MAP[q];
         if (exact !== undefined) { area.innerHTML = renderPriceProduct(PR_LIST[exact]); return; }
         const results = PR_LIST.filter(p => p[0].toLowerCase().includes(ql)).slice(0, 20);
-        area.innerHTML = renderPriceResultList(results, `لا توجد نتائج لرقم الصنف: "${q}"`);
+        area.innerHTML = renderPriceResultList(results, `${t('pricesNoResults')} "${q}"`);
     } else {
         const ql      = q.toLowerCase();
         const results = PR_LIST.filter(p => p[1].toLowerCase().includes(ql)).slice(0, 20);
-        area.innerHTML = renderPriceResultList(results, `لا توجد نتائج لـ "${q}"`);
+        area.innerHTML = renderPriceResultList(results, `${t('pricesNoResults')} "${q}"`);
     }
 }
 
@@ -4080,7 +4161,7 @@ function renderPriceResultList(results, emptyMsg) {
             </div>
         </div>`;
     }).join('');
-    return `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-align:center;">🔎 ${results.length} نتيجة — انقر لعرض التفاصيل</div>${rows}`;
+    return `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-align:center;">🔎 ${results.length} ${t('pricesResultsCount')}</div>${rows}`;
 }
 
 // تفويض الحدث على منطقة النتائج
@@ -4111,49 +4192,48 @@ function renderPriceProduct(p) {
     }
     const barcodes = Object.entries(PR_BARCODE_MAP).filter(([b,i]) => i === PR_CODE_MAP[p[0]]).map(([b]) => b);
     const barcodeHtml = barcodes.map(b => `<div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:3px;">
-        <span style="color:var(--text-muted);font-weight:600;">📦 الباركود</span>
+        <span style="color:var(--text-muted);font-weight:600;">${t('pricesLabelBarcode')}</span>
         <span style="color:var(--text);font-weight:700;font-family:'Courier New',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 8px;">${b}</span>
     </div>`).join('');
     return `<div style="background:var(--surface2);border-radius:14px;border:1px solid var(--border);padding:14px;animation:fadeIn 0.3s;">
-        <div style="display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.1);color:var(--accent);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:8px;">✅ تم العثور على المنتج</div>
+        <div style="display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.1);color:var(--accent);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:8px;">${t('pricesFound')}</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:4px;color:var(--text);">${escapeHtml(p[1])}</div>
         <div style="background:var(--surface3);border-radius:8px;padding:8px 10px;margin-bottom:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:3px;">
-                <span style="color:var(--text-muted);font-weight:600;">🔢 رقم الصنف</span>
+                <span style="color:var(--text-muted);font-weight:600;">${t('pricesLabelItemNo')}</span>
                 <span style="color:var(--text);font-weight:700;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 8px;">${escapeHtml(p[0])}</span>
             </div>
             ${barcodeHtml}
         </div>
         <div style="display:grid;grid-template-columns:${stock !== null ? 'repeat(4,1fr)' : 'repeat(3,1fr)'};gap:8px;margin-bottom:10px;">
             <div style="background:var(--surface3);border-radius:10px;padding:9px 6px;text-align:center;">
-                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">السعر الأصلي</div>
+                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">${t('pricesLabelOrigPrice')}</div>
                 <div style="font-size:15px;font-weight:700;color:var(--text-muted);text-decoration:line-through;">${p[2]||'—'}</div>
             </div>
             <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:10px;padding:9px 6px;text-align:center;">
-                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">بعد الخصم</div>
+                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">${t('pricesLabelSalePrice')}</div>
                 <div style="font-size:15px;font-weight:700;color:var(--accent);">${p[3]||p[2]||'—'}</div>
             </div>
             <div style="background:rgba(220,38,38,0.07);border:1px solid rgba(251,113,133,0.2);border-radius:10px;padding:9px 6px;text-align:center;">
-                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">الخصم</div>
+                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">${t('pricesLabelDiscount')}</div>
                 <div style="font-size:15px;font-weight:700;color:var(--negative);">${p[4]||0}%</div>
             </div>
             ${stock !== null ? `<div style="background:${stockClass};border:1px solid rgba(26,79,168,0.2);border-radius:10px;padding:9px 6px;text-align:center;">
-                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">الرصيد</div>
-                <div style="font-size:15px;font-weight:700;color:${stockColor};">${stock} <span style="font-size:10px;font-weight:400;">قطعة</span></div>
+                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">${t('pricesLabelStock')}</div>
+                <div style="font-size:15px;font-weight:700;color:${stockColor};">${stock} <span style="font-size:10px;font-weight:400;">${t('pricesLabelPcs')}</span></div>
             </div>` : ''}
         </div>
         <div style="display:flex;gap:8px;">
             <button data-edit-code="${escapeHtml(p[0])}" class="pr-edit-btn"
                 style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">
-                ✏️ تعديل
+                ${t('pricesEditBtn')}
             </button>
         </div>
     </div>`;
 }
 
 function editPriceProductFromResult(code) {
-    // للتعديل يجب الذهاب لتبويب المنتجات
-    showToast('للتعديل استخدم تبويب المنتجات');
+    showToast(t('pricesEditNote'));
 }
 
 // ── قائمة المنتجات ──
@@ -4168,7 +4248,7 @@ function renderPricesList(list) {
     if (!container) return;
     const items = list.slice(0, (pricesListPage + 1) * PRICES_PAGE_SIZE);
     if (!items.length) {
-        container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-dim);font-size:13px;">لا توجد منتجات مرفوعة بعد</div>`;
+        container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-dim);font-size:13px;">${t('pricesNoProducts')}</div>`;
         if (countEl) countEl.textContent = '0';
         if (moreBtn) moreBtn.style.display = 'none';
         return;
@@ -4291,7 +4371,7 @@ function psOnCamChange() {
 async function psToggleScanner() {
     if (_psScanning) { psStopScanner(); return; }
     const btn = document.getElementById('ps-toggle-btn');
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التشغيل...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (i18n[currentLang]?.pricesStartScanner || 'تشغيل...');
     btn.disabled = true;
     if (!_psCameras.length) await psLoadCameraList();
     psStartScanner();
@@ -4333,7 +4413,7 @@ async function psStartScanner() {
     _psScanning = true;
     _psCooldown = false;
     const btn = document.getElementById('ps-toggle-btn');
-    btn.innerHTML = '<i class="fas fa-stop-circle"></i> إغلاق الكاميرا';
+    btn.innerHTML = '<i class="fas fa-stop-circle"></i> ' + (i18n[currentLang]?.pricesCloseScanner || 'إغلاق الكاميرا');
     btn.style.background = 'linear-gradient(135deg,#991b1b,#ef4444)';
     btn.disabled = false;
 
@@ -4373,7 +4453,7 @@ async function psStopScanner() {
     if (line)  { line.style.display = 'none'; }
     const btn = document.getElementById('ps-toggle-btn');
     if (btn) {
-        btn.innerHTML = '<i class="fas fa-camera"></i> تشغيل السكانر';
+        btn.innerHTML = '<i class="fas fa-camera"></i> ' + (i18n[currentLang]?.pricesStartScanner || 'تشغيل السكانر');
         btn.style.background = 'linear-gradient(135deg,#b45309,#f59e0b)';
         btn.disabled = false;
     }
