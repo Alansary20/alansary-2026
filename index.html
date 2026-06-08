@@ -1539,6 +1539,8 @@
 
                 <div id="prices-result-area" style="margin-top:12px;"></div>
 
+            </div><!-- end search div margin-bottom:14px -->
+
             <!-- قائمة المنتجات وبحث فيها -->
             <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:14px;">
                 <div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
@@ -1554,103 +1556,6 @@
             </div>
         </div>
 
-        <div class="card" style="margin-top:0;">
-            <div style="font-weight:700;margin-bottom:12px;font-size:0.9rem;display:flex;align-items:center;gap:8px;">
-                <i class="fas fa-file-excel" style="color:#f59e0b;"></i> رفع ملف الأسعار (Excel)
-            </div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px;padding:7px 12px;border-radius:9px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.2);">
-                <i class="fas fa-info-circle" style="color:#f59e0b;margin-left:5px;"></i>
-                يدعم .xlsx و .xlsm — ستختار أعمدة الباركود، رقم الصنف، الاسم، السعر الأصلي، السعر بعد الخصم بعد الرفع
-            </div>
-            <div class="file-label" id="prices-excel-upload-area" onclick="document.getElementById('prices-excel-file').click()"
-                style="border-color:rgba(245,158,11,0.3);cursor:pointer;display:block;text-align:center;padding:16px;border-radius:12px;border:2px dashed rgba(245,158,11,0.3);margin-bottom:10px;">
-                <div style="font-size:1.5rem;margin-bottom:6px;">📊</div>
-                <div style="font-size:0.82rem;color:var(--text-muted);" id="prices-excel-upload-text">انقر لاختيار ملف الأسعار</div>
-                <input type="file" id="prices-excel-file" accept=".xlsx,.xlsm,.xls,.xlsb" style="display:none;">
-            </div>
-            <button class="btn-primary" id="prices-excel-process-btn" onclick="processPricesExcelFile()" style="display:none;margin-bottom:8px;background:linear-gradient(135deg,#b45309,#f59e0b);">
-                <i class="fas fa-upload"></i> رفع ملف الأسعار
-            </button>
-            <div id="prices-upload-status" style="margin-top:8px;font-size:12px;color:var(--text-muted);text-align:center;"></div>
-        </div>
-
-        <div class="card" style="margin-top:0;">
-            <div style="font-weight:700;margin-bottom:12px;font-size:0.9rem;display:flex;align-items:center;gap:8px;">
-                <i class="fas fa-warehouse" style="color:#f59e0b;"></i> رفع ملف الأرصدة (Excel)
-            </div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px;padding:7px 12px;border-radius:9px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.2);">
-                <i class="fas fa-info-circle" style="color:#f59e0b;margin-left:5px;"></i>
-                يدعم ملف Dynamics مباشرةً (عمود الفعلي النهائي تلقائياً) أو ملف بسيط: العمود A رقم الصنف | العمود B الكمية
-            </div>
-            <div class="file-label" id="prices-stock-upload-area" onclick="document.getElementById('prices-stock-file').click()"
-                style="border-color:rgba(59,130,246,0.3);cursor:pointer;display:block;text-align:center;padding:16px;border-radius:12px;border:2px dashed rgba(59,130,246,0.3);margin-bottom:10px;">
-                <div style="font-size:1.5rem;margin-bottom:6px;">📦</div>
-                <div style="font-size:0.82rem;color:var(--text-muted);" id="prices-stock-upload-text">انقر لاختيار ملف الرصيد</div>
-                <input type="file" id="prices-stock-file" accept=".xlsx,.xlsm,.xls" style="display:none;">
-            </div>
-            <button class="btn-primary" id="prices-stock-process-btn" onclick="processPricesStockFile()" style="display:none;margin-bottom:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);">
-                <i class="fas fa-upload"></i> رفع ملف الرصيد
-            </button>
-            <div id="prices-stock-status" style="margin-top:8px;font-size:12px;color:var(--text-muted);text-align:center;"></div>
-        </div>
-
-        <div class="card" style="margin-top:0;">
-            <div style="font-weight:700;margin-bottom:12px;font-size:0.9rem;display:flex;align-items:center;gap:8px;">
-                <i class="fas fa-plus-circle" style="color:#f59e0b;"></i> إضافة / تعديل منتج يدوياً
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                <div>
-                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">الباركود</label>
-                    <input class="input-field" type="text" id="pf-barcode" placeholder="الباركود" inputmode="numeric" style="margin-bottom:0;">
-                </div>
-                <div>
-                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">رقم الصنف *</label>
-                    <input class="input-field" type="text" id="pf-code" placeholder="رقم الصنف" style="margin-bottom:0;">
-                </div>
-            </div>
-            <div style="margin-bottom:8px;">
-                <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">اسم المنتج *</label>
-                <input class="input-field" type="text" id="pf-name" placeholder="اسم المنتج بالعربي" style="margin-bottom:0;direction:rtl;">
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
-                <div>
-                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">السعر الأصلي</label>
-                    <input class="input-field" type="number" id="pf-orig" placeholder="0" inputmode="decimal" oninput="calcPriceDiscount()" style="margin-bottom:0;">
-                </div>
-                <div>
-                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">سعر الخصم</label>
-                    <input class="input-field" type="number" id="pf-sale" placeholder="0" inputmode="decimal" oninput="calcPriceDiscount()" style="margin-bottom:0;">
-                </div>
-                <div>
-                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">الرصيد</label>
-                    <input class="input-field" type="number" id="pf-stock" placeholder="0" inputmode="numeric" min="0" style="margin-bottom:0;">
-                </div>
-            </div>
-            <div id="pf-discount-preview" style="text-align:center;font-size:12px;color:var(--negative);margin-bottom:10px;display:none;">نسبة الخصم: <strong id="pf-disc-val">0%</strong></div>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-primary" onclick="savePriceProduct()" style="background:linear-gradient(135deg,#b45309,#f59e0b);">
-                    <i class="fas fa-save"></i> حفظ المنتج
-                </button>
-                <button class="btn-secondary" onclick="clearPriceForm()" style="flex:0 0 auto;width:auto;padding:13px 18px;">
-                    <i class="fas fa-redo"></i>
-                </button>
-            </div>
-            <div id="pf-success" style="display:none;margin-top:10px;padding:10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;text-align:center;font-size:13px;color:var(--accent);">✅ تم الحفظ بنجاح!</div>
-        </div>
-
-        <div class="card" style="margin-top:0;">
-            <div style="font-weight:700;margin-bottom:12px;font-size:0.9rem;display:flex;align-items:center;gap:8px;">
-                <i class="fas fa-download" style="color:#f59e0b;"></i> تصدير البيانات
-            </div>
-            <button class="btn-primary" onclick="exportPricesData()" style="background:linear-gradient(135deg,#b45309,#f59e0b);">
-                <i class="fas fa-file-excel"></i> تصدير الأسعار والأرصدة (Excel)
-            </button>
-            <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
-                <button class="btn-secondary" onclick="confirmClearPricesData()" style="color:var(--negative);border-color:rgba(220,38,38,0.3);">
-                    <i class="fas fa-trash-alt"></i> مسح بيانات الأسعار
-                </button>
-            </div>
-        </div>
     </div>
     <!-- ══ نهاية تبويب الأسعار ══ -->
 
@@ -1677,7 +1582,7 @@
         <div id="productsTableContainer" class="data-wrapper"></div>
         <button id="clearProductsBtn" class="btn-secondary" style="margin-top:12px;"><span data-i18n="clearProducts">مسح كل المنتجات</span></button>
     </div></div>
-</div>
+    </div><!-- end app-container -->
 <!-- نافذة تعيين الأعمدة -->
 <div id="colMapModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);justify-content:center;align-items:flex-start;z-index:5000;padding:10px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:24px;padding:24px 20px 20px;width:100%;max-width:520px;border:1px solid rgba(99,102,241,0.3);box-shadow:0 30px 80px rgba(0,0,0,0.8);position:relative;margin:20px auto;min-height:min-content;">
@@ -2050,6 +1955,8 @@
                 { id: 'barcode', label: t('thBarcode'),  icon: 'fas fa-barcode',     color: 'var(--accent2)',    required: false, keywords: ['باركود','barcode','بار','كود'] },
                 { id: 'itemno',  label: t('thItemNo'),   icon: 'fas fa-hashtag',     color: 'var(--accent)',     required: false, keywords: ['رقم الصنف','رقم','item','صنف'] },
                 { id: 'name',    label: t('thName'),     icon: 'fas fa-tag',         color: 'var(--text-muted)', required: false, keywords: ['اسم','name','وصف','desc','المادة'] },
+                { id: 'price_orig', label: 'السعر الأصلي', icon: 'fas fa-money-bill', color: '#9ca3af', required: false, keywords: ['أصلي','original','سعر قبل','سعر أصلي','سعر1'] },
+                { id: 'price_sale', label: 'سعر الخصم',   icon: 'fas fa-tags',       color: '#f59e0b', required: false, keywords: ['خصم','sale','بعد','صافي','net','سعر بعد','سعر2'] },
             ],
             async function(colMap) {
                 if (colMap.barcode === null && colMap.itemno === null) { showToast(t('selectBarcodeOrItem'), true); return; }
@@ -2078,8 +1985,10 @@
                                 const barcode = colMap.barcode !== null ? String(row[colMap.barcode]||'').trim().replace(/\.0+$/,'') : '';
                                 const itemno  = colMap.itemno  !== null ? String(row[colMap.itemno] ||'').trim().replace(/\.0+$/,'') : '';
                                 const name    = colMap.name    !== null ? String(row[colMap.name]   ||'').trim() : '';
+                                const price_orig = colMap.price_orig !== null && colMap.price_orig !== undefined ? (parseFloat(row[colMap.price_orig]) || 0) : 0;
+                                const price_sale = colMap.price_sale !== null && colMap.price_sale !== undefined ? (parseFloat(row[colMap.price_sale]) || price_orig) : price_orig;
                                 if (!barcode && !itemno) continue;
-                                store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name || 'بدون اسم', sourceId }); totalAdded++;
+                                store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name || 'بدون اسم', price_orig, price_sale, sourceId }); totalAdded++;
                             }
                             await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
                         }
@@ -2866,6 +2775,12 @@
         } else {
             setTimeout(() => _renderTab(tab), 0);
         }
+        // تحديث فهرس الأسعار إذا تغيرت المنتجات أو المرجع
+        if (!dirtyStores || dirtyStores.some(s => ['prods','stock'].includes(s))) {
+            if (typeof refreshPricesList === 'function') {
+                setTimeout(() => refreshPricesList(), 200);
+            }
+        }
     }
 
     // دوال التعديل
@@ -3514,7 +3429,7 @@
     function initDB() {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = (e) => {
-            db = e.target.result;
+            db = e.target.result; window.db = db;
             if (!db.objectStoreNames.contains("products")) db.createObjectStore("products", { keyPath: "id", autoIncrement: false });
             if (!db.objectStoreNames.contains("inventory")) db.createObjectStore("inventory", { keyPath: "key" });
             if (!db.objectStoreNames.contains("stock")) db.createObjectStore("stock", { keyPath: "key" });
@@ -3525,7 +3440,7 @@
             }
             if (!db.objectStoreNames.contains("settings")) db.createObjectStore("settings", { keyPath: "k" });
         };
-        req.onsuccess = (e) => { db = e.target.result; updateAllUI(); listCameras(); };
+        req.onsuccess = (e) => { db = e.target.result; window.db = db; updateAllUI(); listCameras(); };
         req.onerror = (e) => console.error(e);
     }
     // ══════════════════════════════════════════════
@@ -3972,89 +3887,72 @@
 <!-- ══════════════════════════════════════════════ -->
 <!-- تبويب الأسعار والأرصدة — JavaScript كامل      -->
 <!-- ══════════════════════════════════════════════ -->
-<!-- Modal تعيين أعمدة الأسعار -->
-<div class="modal-overlay" id="prices-col-map-modal" onclick="if(event.target===this)closePricesColMap()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);z-index:6000;align-items:flex-end;justify-content:center;">
-  <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;font-family:'Cairo',sans-serif;">
-    <button onclick="closePricesColMap()" style="float:left;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">✕</button>
-    <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:#f59e0b;">📊 تعيين أعمدة ملف الأسعار</div>
-    <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;line-height:1.5;">اختر العمود المقابل لكل حقل. صف المعاينة من الملف الفعلي.</div>
-    <div id="prices-col-preview" style="background:var(--surface2);border-radius:8px;padding:8px;margin-bottom:14px;overflow-x:auto;"></div>
-    <div id="prices-col-fields" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="confirmPricesColMap()" style="flex:2;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">✅ تأكيد ورفع</button>
-      <button onclick="closePricesColMap()" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:14px;cursor:pointer;">إلغاء</button>
-    </div>
-    <div id="prices-col-error" style="margin-top:8px;font-size:12px;color:var(--negative);text-align:center;display:none;"></div>
-  </div>
-</div>
-
-<!-- Modal تعيين أعمدة رصيد الأسعار -->
-<div class="modal-overlay" id="prices-stk-map-modal" onclick="if(event.target===this)closePricesStkMap()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);z-index:6000;align-items:flex-end;justify-content:center;">
-  <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;font-family:'Cairo',sans-serif;">
-    <button onclick="closePricesStkMap()" style="float:left;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">✕</button>
-    <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:#3b82f6;">📦 تعيين أعمدة ملف الرصيد</div>
-    <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;line-height:1.5;">اختر العمود المقابل لكل حقل.</div>
-    <div id="prices-stk-preview" style="background:var(--surface2);border-radius:8px;padding:8px;margin-bottom:14px;overflow-x:auto;"></div>
-    <div style="margin-bottom:10px;">
-        <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;"><span style="color:var(--negative);">*</span> رقم الصنف</label>
-        <select id="ps-smap-code" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:'Cairo',sans-serif;background:var(--surface2);color:var(--text);outline:none;"></select>
-    </div>
-    <div style="margin-bottom:10px;">
-        <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">اسم الصنف (اختياري)</label>
-        <select id="ps-smap-name" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:'Cairo',sans-serif;background:var(--surface2);color:var(--text);outline:none;"></select>
-    </div>
-    <div style="margin-bottom:16px;">
-        <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;"><span style="color:var(--negative);">*</span> الرصيد (الفعلي النهائي)</label>
-        <select id="ps-smap-qty" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:'Cairo',sans-serif;background:var(--surface2);color:var(--text);outline:none;"></select>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="confirmPricesStkMap()" style="flex:2;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">✅ تأكيد ورفع</button>
-      <button onclick="closePricesStkMap()" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:14px;cursor:pointer;">إلغاء</button>
-    </div>
-    <div id="prices-stk-error" style="margin-top:8px;font-size:12px;color:var(--negative);text-align:center;display:none;"></div>
-  </div>
-</div>
-
 <script>
 // ══════════════════════════════════════════════════════
-//  نظام الأسعار والأرصدة — مدمج في ملف الجرد
+//  نظام الأسعار والأرصدة — يقرأ من IndexedDB مباشرةً
 // ══════════════════════════════════════════════════════
 
-// بيانات المنتجات (مخزّنة في localStorage)
-const PRICES_KEY        = 'prices_local_products';
-const PRICES_STOCK_KEY  = 'prices_stock_data';
-const PRICES_BARCODES_KEY = 'prices_barcode_map';
-
-// تحميل البيانات
-let PRICES_PRODUCTS   = JSON.parse(localStorage.getItem(PRICES_KEY) || '{}');
-// { code: { c, n, o, s, d, stk, barcodes:[] } }
-let PRICES_STOCK_DATA = JSON.parse(localStorage.getItem(PRICES_STOCK_KEY) || '{}');
-// { code: qty }
-
-// بناء خرائط البحث
-let PR_CODE_MAP    = {};  // code -> index in PR_LIST
+// خرائط البحث (تُبنى من IndexedDB)
+let PR_CODE_MAP    = {};  // item_no -> index in PR_LIST
 let PR_BARCODE_MAP = {};  // barcode -> index in PR_LIST
 let PR_LIST        = []; // [code, name, orig, sale, disc, stock]
 
-function rebuildPricesIndex() {
+async function rebuildPricesIndex() {
     PR_CODE_MAP    = {};
     PR_BARCODE_MAP = {};
     PR_LIST        = [];
-    Object.values(PRICES_PRODUCTS).forEach(p => {
-        if (!p.c) return;
-        const orig  = parseFloat(p.o) || 0;
-        const sale  = parseFloat(p.s) !== undefined ? parseFloat(p.s) : orig;
-        const disc  = p.d !== undefined ? p.d : (orig > 0 ? Math.round((orig - sale) / orig * 100) : 0);
-        const stk   = PRICES_STOCK_DATA[p.c] !== undefined ? PRICES_STOCK_DATA[p.c] : (p.stk !== undefined ? p.stk : null);
-        const name  = p.n || p.c;
-        const idx   = PR_LIST.length;
-        PR_LIST.push([p.c, name, orig, sale, disc, stk]);
-        PR_CODE_MAP[p.c] = idx;
-        const barcodes = Array.isArray(p.barcodes) ? p.barcodes : (p.b ? [p.b] : []);
-        barcodes.forEach(b => { if (b) PR_BARCODE_MAP[b] = idx; });
+
+    const db = await getPricesDB();
+    if (!db) return;
+
+    const prods = await new Promise(r => {
+        const tx = db.transaction('products', 'readonly');
+        tx.objectStore('products').getAll().onsuccess = e => r(e.target.result);
+    });
+
+    const stockArr = await new Promise(r => {
+        const tx = db.transaction('stock', 'readonly');
+        tx.objectStore('stock').getAll().onsuccess = e => r(e.target.result);
+    });
+    const stockMap = {};
+    stockArr.forEach(s => { stockMap[s.key] = s.qty; });
+
+    prods.forEach(p => {
+        const code = p.item_no || p.barcode;
+        if (!code) return;
+        const name = p.name || code;
+        const orig = parseFloat(p.price_orig) || 0;
+        const sale = parseFloat(p.price_sale) || orig;
+        const disc = orig > 0 ? Math.round((orig - sale) / orig * 100) : 0;
+        const stk  = stockMap[p.item_no] !== undefined ? stockMap[p.item_no]
+                   : stockMap[p.barcode] !== undefined ? stockMap[p.barcode] : null;
+        const idx  = PR_LIST.length;
+        PR_LIST.push([code, name, orig, sale, disc, stk]);
+        if (p.item_no)  PR_CODE_MAP[p.item_no]    = idx;
+        if (p.barcode)  PR_CODE_MAP[p.barcode]     = idx;
+        if (p.barcode)  PR_BARCODE_MAP[p.barcode]  = idx;
+        if (p.item_no && p.barcode && p.item_no !== p.barcode)
+            PR_BARCODE_MAP[p.barcode] = idx;
     });
 }
-rebuildPricesIndex();
+
+// فتح نفس قاعدة بيانات الجرد مباشرةً
+function getPricesDB() {
+    return new Promise(resolve => {
+        // أولاً جرّب window.db المحفوظ
+        if (window.db) { resolve(window.db); return; }
+        // إذا لم يكن جاهزاً، افتح DB بنفس اسم الملف
+        const rawPath = (location.href || location.pathname || '').replace(/[^a-zA-Z0-9]/g, '_').slice(-40);
+        const dbName  = 'InvSmartDB_' + (rawPath || 'default');
+        const req = indexedDB.open(dbName);
+        req.onsuccess = e => {
+            const idb = e.target.result;
+            window.db = idb; // احفظها للمرات القادمة
+            resolve(idb);
+        };
+        req.onerror = () => resolve(null);
+    });
+}
 
 // ── نوع البحث ──
 let priceSearchType = 'barcode';
@@ -4088,21 +3986,31 @@ function onPriceSearchInput() {
     if (priceSearchType === 'code' && v.length >= 3) doPriceSearch();
 }
 
-function doPriceSearch() {
-    const q  = document.getElementById('prices-search-input').value.trim();
+async function doPriceSearch() {
+    const q    = document.getElementById('prices-search-input').value.trim();
     const area = document.getElementById('prices-result-area');
     if (!q) return;
+
+    // تأكد من بناء الفهرس أولاً
+    if (!PR_LIST.length) {
+        area.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">⏳ جاري تحميل البيانات...</div>';
+        await rebuildPricesIndex();
+    }
+
     if (priceSearchType === 'barcode') {
         const idx = PR_BARCODE_MAP[q];
-        area.innerHTML = idx !== undefined ? renderPriceProduct(PR_LIST[idx]) : `<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:12px;color:var(--negative);font-size:13px;text-align:center;">❌ لم يُعثر على منتج بهذا الباركود: ${q}</div>`;
+        area.innerHTML = idx !== undefined
+            ? renderPriceProduct(PR_LIST[idx])
+            : `<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:12px;color:var(--negative);font-size:13px;text-align:center;">❌ لم يُعثر على منتج بهذا الباركود: ${q}</div>`;
     } else if (priceSearchType === 'code') {
+        const ql    = q.toLowerCase();
         const exact = PR_CODE_MAP[q];
         if (exact !== undefined) { area.innerHTML = renderPriceProduct(PR_LIST[exact]); return; }
-        const results = PR_LIST.filter(p => p[0].toLowerCase().includes(q.toLowerCase())).slice(0, 20);
+        const results = PR_LIST.filter(p => p[0].toLowerCase().includes(ql)).slice(0, 20);
         area.innerHTML = renderPriceResultList(results, `لا توجد نتائج لرقم الصنف: "${q}"`);
     } else {
-        const ql = q.toLowerCase();
-        const results = PR_LIST.filter(p => p[1].includes(q) || p[1].toLowerCase().includes(ql)).slice(0, 20);
+        const ql      = q.toLowerCase();
+        const results = PR_LIST.filter(p => p[1].toLowerCase().includes(ql)).slice(0, 20);
         area.innerHTML = renderPriceResultList(results, `لا توجد نتائج لـ "${q}"`);
     }
 }
@@ -4110,20 +4018,41 @@ function doPriceSearch() {
 function renderPriceResultList(results, emptyMsg) {
     if (!results.length) return `<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:12px;color:var(--negative);font-size:13px;text-align:center;">❌ ${emptyMsg}</div>`;
     if (results.length === 1) return renderPriceProduct(results[0]);
-    return `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-align:center;">🔎 ${results.length} نتيجة</div>` +
-        results.map(p => `<div onclick="document.getElementById('prices-result-area').innerHTML=renderPriceProduct(PR_LIST[PR_CODE_MAP['${p[0].replace(/'/g,"\\'")}']]);this.parentElement.querySelectorAll('[onclick]').forEach(x=>x.remove());"
-            style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s;"
-            onmouseenter="this.style.borderColor='rgba(245,158,11,0.4)'" onmouseleave="this.style.borderColor='var(--border)'">
+    const rows = results.map((p, i) => {
+        const hasDisc = p[2] && p[3] && parseFloat(p[2]) !== parseFloat(p[3]);
+        return `<div data-pcode="${escapeHtml(p[0])}" class="pr-result-row"
+            style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s;">
             <div style="flex:1;min-width:0;">
                 <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);">${escapeHtml(p[1])}</div>
-                <div style="font-size:10px;color:var(--text-muted);">${p[0]}</div>
+                <div style="font-size:10px;color:var(--text-muted);">${escapeHtml(p[0])}</div>
             </div>
             <div style="text-align:left;flex-shrink:0;">
-                <div style="color:#f59e0b;font-size:15px;font-weight:700;">${p[3] || p[2]}</div>
-                ${p[2] && p[3] && p[2] !== p[3] ? `<div style="color:var(--text-muted);font-size:10px;text-decoration:line-through;">${p[2]}</div>` : ''}
+                <div style="color:#f59e0b;font-size:15px;font-weight:700;">${p[3] || p[2] || '—'}</div>
+                ${hasDisc ? `<div style="color:var(--text-muted);font-size:10px;text-decoration:line-through;">${p[2]}</div>` : ''}
+                ${p[4] ? `<div style="background:rgba(220,38,38,0.1);color:var(--negative);border-radius:5px;font-size:10px;font-weight:700;padding:1px 5px;text-align:center;">${p[4]}%</div>` : ''}
             </div>
-        </div>`).join('');
+        </div>`;
+    }).join('');
+    return `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-align:center;">🔎 ${results.length} نتيجة — انقر لعرض التفاصيل</div>${rows}`;
 }
+
+// تفويض الحدث على منطقة النتائج
+document.addEventListener('click', function(e) {
+    const row = e.target.closest('.pr-result-row');
+    if (row) {
+        const code = row.getAttribute('data-pcode');
+        const idx  = PR_CODE_MAP[code];
+        if (idx !== undefined) {
+            const area = document.getElementById('prices-result-area');
+            if (area) area.innerHTML = renderPriceProduct(PR_LIST[idx]);
+        }
+        return;
+    }
+    const editBtn = e.target.closest('.pr-edit-btn');
+    if (editBtn) {
+        editPriceProductFromResult(editBtn.getAttribute('data-edit-code'));
+    }
+});
 
 function renderPriceProduct(p) {
     if (!p) return '';
@@ -4167,7 +4096,7 @@ function renderPriceProduct(p) {
             </div>` : ''}
         </div>
         <div style="display:flex;gap:8px;">
-            <button onclick="editPriceProductFromResult('${p[0].replace(/'/g,"\\'")}')"
+            <button data-edit-code="${escapeHtml(p[0])}" class="pr-edit-btn"
                 style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">
                 ✏️ تعديل
             </button>
@@ -4176,19 +4105,8 @@ function renderPriceProduct(p) {
 }
 
 function editPriceProductFromResult(code) {
-    const p = PRICES_PRODUCTS[code];
-    if (!p) return;
-    document.getElementById('pf-code').value  = p.c || '';
-    document.getElementById('pf-name').value  = p.n || '';
-    document.getElementById('pf-orig').value  = p.o || '';
-    document.getElementById('pf-sale').value  = p.s || '';
-    document.getElementById('pf-stock').value = p.stk !== undefined ? p.stk : '';
-    const barcodes = Array.isArray(p.barcodes) ? p.barcodes : (p.b ? [p.b] : []);
-    document.getElementById('pf-barcode').value = barcodes[0] || '';
-    calcPriceDiscount();
-    // التمرير للنموذج
-    const card = document.getElementById('pf-code').closest('.card');
-    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // للتعديل يجب الذهاب لتبويب المنتجات
+    showToast('للتعديل استخدم تبويب المنتجات');
 }
 
 // ── قائمة المنتجات ──
@@ -4212,7 +4130,7 @@ function renderPricesList(list) {
     container.innerHTML = items.map(p => {
         const stk = p[5] !== null && p[5] !== undefined ? Number(p[5]) : null;
         const stkBadge = stk !== null ? `<div style="background:${stk===0?'rgba(220,38,38,0.1)':stk<=5?'rgba(245,158,11,0.1)':'#eef4ff'};color:${stk===0?'var(--negative)':stk<=5?'#f59e0b':'#1a4fa8'};border-radius:5px;font-size:10px;font-weight:700;padding:1px 5px;margin-top:2px;display:inline-block;">📦 ${stk}</div>` : '';
-        return `<div onclick="showPriceDetail('${p[0].replace(/'/g,"\\'")}')"
+        return `<div data-pcode="${escapeHtml(p[0])}" class="pr-result-row"
             style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s;"
             onmouseenter="this.style.background='var(--surface3)'" onmouseleave="this.style.background='var(--surface2)'">
             <div style="flex:1;min-width:0;">
@@ -4252,8 +4170,11 @@ function loadMorePrices() {
     renderPricesList(pricesFilteredList.length ? pricesFilteredList : PR_LIST);
 }
 
-function refreshPricesList() {
-    rebuildPricesIndex();
+async function refreshPricesList() {
+    const container = document.getElementById('prices-product-list');
+    const countEl   = document.getElementById('prices-list-count');
+    if (container) container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">⏳ جاري التحميل...</div>';
+    await rebuildPricesIndex();
     pricesFilteredList = PR_LIST.slice();
     pricesListPage = 0;
     renderPricesList(pricesFilteredList);
@@ -4267,337 +4188,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         }
     });
 });
-
-// ── رفع ملف الأسعار ──
-let _pendingPricesExcelFile = null;
-let _pendingPricesRows = null;
-let _pendingPricesColMap = null;
-
-document.getElementById('prices-excel-file').addEventListener('change', function() {
-    if (this.files[0]) {
-        _pendingPricesExcelFile = this.files[0];
-        document.getElementById('prices-excel-upload-text').textContent = this.files[0].name;
-        document.getElementById('prices-excel-process-btn').style.display = 'block';
-    }
-});
-
-async function processPricesExcelFile() {
-    if (!_pendingPricesExcelFile) return;
-    const status = document.getElementById('prices-upload-status');
-    status.textContent = '⏳ جاري قراءة الملف...';
-    try {
-        const { data, type } = await readFileRobust(_pendingPricesExcelFile);
-        const wb   = parseWorkbook(data, type);
-        const ws   = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-        if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
-        _pendingPricesRows = rows;
-
-        const firstRow = rows[0].map(h => String(h).trim());
-        const maxCols  = Math.min(firstRow.length, 26);
-
-        // عرض معاينة الأعمدة
-        let previewHtml = `<table style="border-collapse:collapse;font-size:11px;width:100%;min-width:300px;">
-            <tr>${firstRow.slice(0,maxCols).map(h => `<th style="background:rgba(245,158,11,0.15);color:#b45309;padding:4px 8px;text-align:center;border:1px solid rgba(245,158,11,0.3);white-space:nowrap;">${escapeHtml(h)||'—'}</th>`).join('')}</tr>`;
-        for (let r = 1; r < Math.min(rows.length, 3); r++) {
-            previewHtml += `<tr>${rows[r].slice(0,maxCols).map(c => `<td style="padding:3px 8px;text-align:center;border:1px solid var(--border);color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(String(c).trim()).slice(0,20)||'—'}</td>`).join('')}</tr>`;
-        }
-        previewHtml += '</table>';
-        document.getElementById('prices-col-preview').innerHTML = previewHtml;
-
-        // بناء الـ dropdowns
-        function buildOpts(selId, autoIdx) {
-            const sel = document.getElementById(selId);
-            sel.innerHTML = `<option value="">— اختر العمود —</option>`;
-            firstRow.forEach((h,i) => { const o = document.createElement('option'); o.value=i; o.textContent=`عمود ${i+1}: ${h||'(فارغ)'}`; if(i===autoIdx) o.selected=true; sel.appendChild(o); });
-        }
-        function detect(kws, fallback) {
-            const idx = firstRow.findIndex(h => kws.some(k => h.includes(k)));
-            return idx >= 0 ? idx : fallback;
-        }
-
-        const fields = [
-            { id:'pc-barcode', label:'الباركود',         icon:'fas fa-barcode',    color:'#0891b2', required:false, auto: detect(['باركود','barcode','bcd'], -1) },
-            { id:'pc-code',    label:'رقم الصنف',        icon:'fas fa-hashtag',   color:'#f59e0b', required:true,  auto: detect(['رقم الصنف','رقم صنف','item_no','item no','كود','sku'], 0) },
-            { id:'pc-name',    label:'اسم المنتج',       icon:'fas fa-tag',       color:'#10b981', required:true,  auto: detect(['اسم','name','وصف','desc','المادة'], 1) },
-            { id:'pc-orig',    label:'السعر الأصلي',     icon:'fas fa-money-bill', color:'#9ca3af', required:false, auto: detect(['أصلي','original','قبل','سعر أصلي'], -1) },
-            { id:'pc-sale',    label:'سعر الخصم',        icon:'fas fa-tag',       color:'var(--negative)', required:false, auto: detect(['خصم','sale','بعد','صافي','net','discount'], -1) },
-        ];
-
-        const fieldsContainer = document.getElementById('prices-col-fields');
-        fieldsContainer.innerHTML = fields.map(f => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            <label style="font-size:12px;font-weight:600;color:var(--text-muted);min-width:110px;flex-shrink:0;">
-                ${f.required ? '<span style="color:var(--negative);">*</span> ' : ''}${f.label}
-            </label>
-            <select id="${f.id}" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:'Cairo',sans-serif;background:var(--surface2);color:var(--text);outline:none;"></select>
-        </div>`).join('');
-
-        fields.forEach(f => buildOpts(f.id, f.auto));
-
-        document.getElementById('prices-col-error').style.display = 'none';
-        document.getElementById('prices-col-map-modal').style.display = 'flex';
-        status.textContent = '';
-        document.getElementById('prices-excel-file').value = '';
-    } catch(e) {
-        status.innerHTML = `<span style="color:var(--negative);">❌ خطأ: ${e.message}</span>`;
-    }
-}
-
-function closePricesColMap() {
-    document.getElementById('prices-col-map-modal').style.display = 'none';
-    _pendingPricesRows = null;
-    _pendingPricesExcelFile = null;
-    document.getElementById('prices-excel-process-btn').style.display = 'none';
-    document.getElementById('prices-excel-upload-text').textContent = 'انقر لاختيار ملف الأسعار';
-}
-
-function confirmPricesColMap() {
-    const rows = _pendingPricesRows;
-    if (!rows) return;
-    const errEl = document.getElementById('prices-col-error');
-    const colCode = parseInt(document.getElementById('pc-code').value);
-    const colName = parseInt(document.getElementById('pc-name').value);
-    const colBarcode = parseInt(document.getElementById('pc-barcode').value);
-    const colOrig    = parseInt(document.getElementById('pc-orig').value);
-    const colSale    = parseInt(document.getElementById('pc-sale').value);
-
-    if (isNaN(colCode) || isNaN(colName)) { errEl.textContent='⚠️ رقم الصنف والاسم مطلوبان'; errEl.style.display='block'; return; }
-    errEl.style.display = 'none';
-
-    const startRow = 1; // تخطي السطر الأول (headers)
-    let added = 0;
-
-    rows.forEach((row, ri) => {
-        if (ri < startRow) return;
-        const code = String(row[colCode]||'').trim().replace(/\.0+$/,'');
-        const name = String(row[colName]||'').trim();
-        if (!code || !name) return;
-        const barcode = !isNaN(colBarcode) ? String(row[colBarcode]||'').trim() : '';
-        const orig    = !isNaN(colOrig) ? parseFloat(row[colOrig]) || 0 : 0;
-        const sale    = !isNaN(colSale) ? parseFloat(row[colSale]) || orig : orig;
-        const disc    = orig > 0 ? Math.round((orig - sale) / orig * 100) : 0;
-        const existing = PRICES_PRODUCTS[code] || {};
-        const barcodes  = existing.barcodes || [];
-        if (barcode && !barcodes.includes(barcode)) barcodes.push(barcode);
-        PRICES_PRODUCTS[code] = { c: code, n: name, o: orig, s: sale, d: disc, barcodes, stk: existing.stk };
-        added++;
-    });
-
-    localStorage.setItem(PRICES_KEY, JSON.stringify(PRICES_PRODUCTS));
-    closePricesColMap();
-    rebuildPricesIndex();
-    refreshPricesList();
-    document.getElementById('prices-upload-status').innerHTML = `<span style="color:var(--accent);">✅ تم رفع ${added.toLocaleString('ar')} منتج بنجاح</span>`;
-}
-
-// ── رفع ملف الرصيد ──
-let _pendingPricesStockFile = null;
-let _pendingPricesStockRows = null;
-
-document.getElementById('prices-stock-file').addEventListener('change', function() {
-    if (this.files[0]) {
-        _pendingPricesStockFile = this.files[0];
-        document.getElementById('prices-stock-upload-text').textContent = this.files[0].name;
-        document.getElementById('prices-stock-process-btn').style.display = 'block';
-    }
-});
-
-async function processPricesStockFile() {
-    if (!_pendingPricesStockFile) return;
-    const status = document.getElementById('prices-stock-status');
-    status.textContent = '⏳ جاري قراءة الملف...';
-    try {
-        const { data, type } = await readFileRobust(_pendingPricesStockFile);
-        const wb   = parseWorkbook(data, type);
-        const ws   = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-        if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
-        _pendingPricesStockRows = rows;
-
-        const firstRow = rows[0].map(h => String(h).trim());
-        const maxCols  = Math.min(firstRow.length, 26);
-
-        // معاينة
-        let previewHtml = `<table style="border-collapse:collapse;font-size:11px;width:100%;min-width:200px;">
-            <tr>${firstRow.slice(0,maxCols).map(h => `<th style="background:rgba(59,130,246,0.1);color:#1d4ed8;padding:4px 8px;text-align:center;border:1px solid rgba(59,130,246,0.2);white-space:nowrap;">${escapeHtml(h)||'—'}</th>`).join('')}</tr>`;
-        for (let r = 1; r < Math.min(rows.length, 3); r++) {
-            previewHtml += `<tr>${rows[r].slice(0,maxCols).map(c => `<td style="padding:3px 8px;border:1px solid var(--border);color:var(--text-muted);text-align:center;">${escapeHtml(String(c).trim()).slice(0,15)||'—'}</td>`).join('')}</tr>`;
-        }
-        previewHtml += '</table>';
-        document.getElementById('prices-stk-preview').innerHTML = previewHtml;
-
-        function buildStkOpts(selId, autoIdx) {
-            const sel = document.getElementById(selId);
-            sel.innerHTML = `<option value="">— غير محدد —</option>`;
-            firstRow.forEach((h,i) => { const o=document.createElement('option'); o.value=i; o.textContent=`عمود ${i+1}: ${h||'(فارغ)'}`; if(i===autoIdx) o.selected=true; sel.appendChild(o); });
-        }
-        function detect(kws, fallback) {
-            const idx = firstRow.findIndex(h => kws.some(k => h.includes(k)));
-            return idx >= 0 ? idx : fallback;
-        }
-        buildStkOpts('ps-smap-code', detect(['رقم الصنف','رقم صنف','كود','sku','item'], 0));
-        buildStkOpts('ps-smap-name', detect(['اسم الصنف','اسم المنتج','اسم','name'], -1));
-        buildStkOpts('ps-smap-qty',  detect(['فعلي نهائي','الفعلي النهائي','رصيد','كمية','stock','qty','quantity','مخزون'], 1));
-
-        document.getElementById('prices-stk-error').style.display = 'none';
-        document.getElementById('prices-stk-map-modal').style.display = 'flex';
-        status.textContent = '';
-        document.getElementById('prices-stock-file').value = '';
-    } catch(e) {
-        status.innerHTML = `<span style="color:var(--negative);">❌ خطأ: ${e.message}</span>`;
-    }
-}
-
-function closePricesStkMap() {
-    document.getElementById('prices-stk-map-modal').style.display = 'none';
-    _pendingPricesStockRows = null;
-    _pendingPricesStockFile = null;
-    document.getElementById('prices-stock-process-btn').style.display = 'none';
-    document.getElementById('prices-stock-upload-text').textContent = 'انقر لاختيار ملف الرصيد';
-}
-
-function confirmPricesStkMap() {
-    const rows = _pendingPricesStockRows;
-    if (!rows) return;
-    const errEl   = document.getElementById('prices-stk-error');
-    const colCode = parseInt(document.getElementById('ps-smap-code').value);
-    const colName = parseInt(document.getElementById('ps-smap-name').value);
-    const colQty  = parseInt(document.getElementById('ps-smap-qty').value);
-    if (isNaN(colCode) || isNaN(colQty)) { errEl.textContent='⚠️ يرجى اختيار أعمدة رقم الصنف والكمية'; errEl.style.display='block'; return; }
-    errEl.style.display = 'none';
-
-    const startRow = isNaN(Number(rows[0][colQty])) ? 1 : 0;
-    let updated = 0, added = 0;
-
-    rows.forEach((row, ri) => {
-        if (ri < startRow) return;
-        const code = String(row[colCode]||'').trim().replace(/\.0+$/,'');
-        if (!code) return;
-        const qty = Number(row[colQty]);
-        if (isNaN(qty)) return;
-        PRICES_STOCK_DATA[code] = qty;
-        if (PRICES_PRODUCTS[code]) {
-            PRICES_PRODUCTS[code].stk = qty;
-            updated++;
-        } else {
-            // أضف منتج جديد من الرصيد فقط
-            const name = (!isNaN(colName) && row[colName]) ? String(row[colName]).trim() : code;
-            PRICES_PRODUCTS[code] = { c: code, n: name, o: 0, s: 0, d: 0, barcodes: [], stk: qty };
-            added++;
-        }
-    });
-
-    localStorage.setItem(PRICES_STOCK_KEY, JSON.stringify(PRICES_STOCK_DATA));
-    localStorage.setItem(PRICES_KEY, JSON.stringify(PRICES_PRODUCTS));
-    closePricesStkMap();
-    rebuildPricesIndex();
-    refreshPricesList();
-    document.getElementById('prices-stock-status').innerHTML =
-        `<span style="color:var(--accent);">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>` +
-        (added ? ` — <span style="color:#1a4fa8;">➕ ${added.toLocaleString('ar')} منتج جديد من الرصيد</span>` : '');
-}
-
-// ── نموذج الإضافة اليدوية ──
-function calcPriceDiscount() {
-    const orig = parseFloat(document.getElementById('pf-orig').value) || 0;
-    const sale = parseFloat(document.getElementById('pf-sale').value) || 0;
-    const preview = document.getElementById('pf-discount-preview');
-    if (orig > 0 && sale > 0 && sale < orig) {
-        const disc = Math.round((orig - sale) / orig * 100);
-        document.getElementById('pf-disc-val').textContent = disc + '%';
-        preview.style.display = 'block';
-    } else { preview.style.display = 'none'; }
-}
-
-function savePriceProduct() {
-    const code    = document.getElementById('pf-code').value.trim();
-    const name    = document.getElementById('pf-name').value.trim();
-    const barcode = document.getElementById('pf-barcode').value.trim();
-    const orig    = parseFloat(document.getElementById('pf-orig').value) || 0;
-    const sale    = parseFloat(document.getElementById('pf-sale').value) || orig;
-    const stk     = document.getElementById('pf-stock').value !== '' ? parseInt(document.getElementById('pf-stock').value) : undefined;
-    if (!code || !name) { showToast('⚠️ رقم الصنف والاسم مطلوبان', true); return; }
-    const disc    = orig > 0 ? Math.round((orig - sale) / orig * 100) : 0;
-    const existing = PRICES_PRODUCTS[code] || {};
-    const barcodes = existing.barcodes || [];
-    if (barcode && !barcodes.includes(barcode)) barcodes.push(barcode);
-    PRICES_PRODUCTS[code] = { c: code, n: name, o: orig, s: sale, d: disc, barcodes, stk };
-    if (stk !== undefined) PRICES_STOCK_DATA[code] = stk;
-    localStorage.setItem(PRICES_KEY, JSON.stringify(PRICES_PRODUCTS));
-    localStorage.setItem(PRICES_STOCK_KEY, JSON.stringify(PRICES_STOCK_DATA));
-    rebuildPricesIndex();
-    refreshPricesList();
-    const successEl = document.getElementById('pf-success');
-    successEl.style.display = 'block';
-    setTimeout(() => { successEl.style.display = 'none'; }, 2500);
-}
-
-function clearPriceForm() {
-    ['pf-code','pf-name','pf-barcode','pf-orig','pf-sale','pf-stock'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-    });
-    document.getElementById('pf-discount-preview').style.display = 'none';
-}
-
-// ── تصدير الأسعار ──
-async function exportPricesData() {
-    if (!PR_LIST.length) { showToast('لا توجد بيانات للتصدير', true); return; }
-    showToast('⏳ جاري التصدير...');
-    try {
-        const ExcelJS = window.ExcelJS;
-        if (!ExcelJS) { showToast('❌ مكتبة التصدير غير متاحة', true); return; }
-        const wb = new ExcelJS.Workbook();
-        const ws = wb.addWorksheet('الأسعار والأرصدة', { views:[{rightToLeft:true}] });
-        ws.columns = [
-            { header:'رقم الصنف', key:'code', width:22 },
-            { header:'الاسم',     key:'name', width:32 },
-            { header:'الباركود',  key:'barcode', width:18 },
-            { header:'السعر الأصلي', key:'orig', width:14 },
-            { header:'سعر الخصم',    key:'sale', width:14 },
-            { header:'% الخصم',      key:'disc', width:12 },
-            { header:'الرصيد',        key:'stk',  width:12 },
-        ];
-        const hdr = ws.getRow(1);
-        hdr.height = 22;
-        hdr.eachCell(cell => {
-            cell.fill      = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFb45309' } };
-            cell.font      = { color:{ argb:'FFFFFFFF' }, bold:true, size:11 };
-            cell.alignment = { horizontal:'center', vertical:'middle', readingOrder:'rtl' };
-        });
-        PR_LIST.forEach((p, ri) => {
-            const barcodes = Object.entries(PR_BARCODE_MAP).filter(([b,i]) => i === ri).map(([b]) => b);
-            const row = ws.addRow({
-                code: p[0], name: p[1], barcode: barcodes.join(', '),
-                orig: p[2]||'', sale: p[3]||'', disc: p[4]||0,
-                stk: p[5] !== null && p[5] !== undefined ? p[5] : '',
-            });
-            row.height = 18;
-            row.eachCell(cell => { cell.alignment = { horizontal:'center', readingOrder:'rtl' }; });
-        });
-        ws.views = [{ state:'frozen', ySplit:1, rightToLeft:true }];
-        const buf = await wb.xlsx.writeBuffer();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-        a.download = 'الأسعار_والأرصدة_' + new Date().toLocaleDateString('ar-SA').replace(/\//g,'-') + '.xlsx';
-        a.click();
-        showToast('✅ تم التصدير بنجاح');
-    } catch(e) { showToast('❌ خطأ في التصدير: ' + e.message, true); }
-}
-
-// ── مسح بيانات الأسعار ──
-function confirmClearPricesData() {
-    customConfirm('⚠️ سيتم مسح جميع بيانات الأسعار والأرصدة نهائياً. متابعة؟', () => {
-        PRICES_PRODUCTS   = {};
-        PRICES_STOCK_DATA = {};
-        localStorage.removeItem(PRICES_KEY);
-        localStorage.removeItem(PRICES_STOCK_KEY);
-        rebuildPricesIndex();
-        refreshPricesList();
-        document.getElementById('prices-result-area').innerHTML = '';
-        showToast('✅ تم مسح بيانات الأسعار');
-    });
-}
 
 // ══════════════════════════════════════════════
 //  سكانر تبويب الأسعار — BarcodeDetector + ZXing
