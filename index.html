@@ -2995,6 +2995,17 @@
 
 
     async function exportStyledExcel({ fileName, sheetName, columns, rows, rowStyle }) {
+        // تحقق من تحميل ExcelJS
+        if (!window.ExcelJS) {
+            // انتظر تحميله حتى 5 ثوانٍ
+            await new Promise((resolve, reject) => {
+                let tries = 0;
+                const check = setInterval(() => {
+                    if (window.ExcelJS) { clearInterval(check); resolve(); }
+                    else if (++tries > 50) { clearInterval(check); reject(new Error('ExcelJS لم يتحمل. تحقق من اتصال الإنترنت.')); }
+                }, 100);
+            });
+        }
         const ExcelJS = window.ExcelJS;
         const wb = new ExcelJS.Workbook();
         const ws = wb.addWorksheet(sheetName || 'Sheet1', { views:[{rightToLeft:true}] });
@@ -3030,81 +3041,100 @@
     // ── تصدير الجرد ──
     document.getElementById('exportInventoryBtn').onclick = async () => {
         showProgress(t('exportingInv'), t('collectingData'), 20);
-        const inv = await new Promise(r => {
-            const tx = db.transaction("inventory","readonly");
-            tx.objectStore("inventory").getAll().onsuccess = e => r(e.target.result);
-        });
-        updateProgress(60, t('creatingFile'));
-        inv.sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
-        await exportStyledExcel({
-            fileName: `جرد_${DATE_STR}.xlsx`,
-            sheetName: 'الجرد',
-            columns: [
-                { header:'الباركود',  key:'barcode', width:22 },
-                { header:'رقم الصنف', key:'key',     width:18 },
-                { header:'الاسم',     key:'name',    width:36 },
-                { header:'الكمية',    key:'qty',     width:10 },
-                { header:'آخر مسح',  key:'time',    width:22 },
-            ],
-            rows: inv.map(i => ({
-                barcode: i.barcode && i.barcode !== i.key ? i.barcode : '',
-                key: i.key, name: i.name, qty: i.qty,
-                time: i.timestamp ? new Date(i.timestamp).toLocaleString('ar-SA') : ''
-            }))
-        });
-        hideProgress(); showToast(t('exportedInv'));
+        try {
+            const inv = await new Promise(r => {
+                const tx = db.transaction("inventory","readonly");
+                tx.objectStore("inventory").getAll().onsuccess = e => r(e.target.result);
+            });
+            updateProgress(60, t('creatingFile'));
+            inv.sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
+            await exportStyledExcel({
+                fileName: `جرد_${DATE_STR}.xlsx`,
+                sheetName: 'الجرد',
+                columns: [
+                    { header:'الباركود',  key:'barcode', width:22 },
+                    { header:'رقم الصنف', key:'key',     width:18 },
+                    { header:'الاسم',     key:'name',    width:36 },
+                    { header:'الكمية',    key:'qty',     width:10 },
+                    { header:'آخر مسح',  key:'time',    width:22 },
+                ],
+                rows: inv.map(i => ({
+                    barcode: i.barcode && i.barcode !== i.key ? i.barcode : '',
+                    key: i.key, name: i.name, qty: i.qty,
+                    time: i.timestamp ? new Date(i.timestamp).toLocaleString('ar-SA') : ''
+                }))
+            });
+            showToast(t('exportedInv'));
+        } catch(err) {
+            showToast('❌ فشل التصدير: ' + err.message, true);
+        } finally {
+            hideProgress();
+        }
     };
 
     // ── تصدير المرجع ──
     document.getElementById('exportStockBtn').onclick = async () => {
         showProgress(t('exportingStock'), t('collectingData'), 20);
-        const stock = await new Promise(r => {
-            const tx = db.transaction("stock","readonly");
-            tx.objectStore("stock").getAll().onsuccess = e => r(e.target.result);
-        });
-        updateProgress(60, t('creatingFile'));
-        await exportStyledExcel({
-            fileName: `مرجع_${DATE_STR}.xlsx`,
-            sheetName: 'المرجع',
-            columns: [
-                { header:'رقم الصنف',      key:'key',  width:18 },
-                { header:'الاسم',           key:'name', width:36 },
-                { header:'الكمية المرجعية', key:'qty',  width:16 },
-            ],
-            rows: stock.map(s => ({ key: s.key, name: s.name, qty: s.qty }))
-        });
-        hideProgress(); showToast(t('exportedStock'));
+        try {
+            const stock = await new Promise(r => {
+                const tx = db.transaction("stock","readonly");
+                tx.objectStore("stock").getAll().onsuccess = e => r(e.target.result);
+            });
+            updateProgress(60, t('creatingFile'));
+            await exportStyledExcel({
+                fileName: `مرجع_${DATE_STR}.xlsx`,
+                sheetName: 'المرجع',
+                columns: [
+                    { header:'رقم الصنف',      key:'key',  width:18 },
+                    { header:'الاسم',           key:'name', width:36 },
+                    { header:'الكمية المرجعية', key:'qty',  width:16 },
+                ],
+                rows: stock.map(s => ({ key: s.key, name: s.name, qty: s.qty }))
+            });
+            showToast(t('exportedStock'));
+        } catch(err) {
+            showToast('❌ فشل التصدير: ' + err.message, true);
+        } finally {
+            hideProgress();
+        }
     };
 
     // ── تصدير المنتجات ──
     document.getElementById('exportProductsBtn').onclick = async () => {
         showProgress(t('exportingProducts'), t('collectingData'), 20);
-        const prods = await new Promise(r => {
-            const tx = db.transaction("products","readonly");
-            tx.objectStore("products").getAll().onsuccess = e => r(e.target.result);
-        });
-        updateProgress(60, t('creatingFile'));
-        await exportStyledExcel({
-            fileName: `منتجات_${DATE_STR}.xlsx`,
-            sheetName: 'المنتجات',
-            columns: [
-                { header:'الباركود',  key:'barcode', width:22 },
-                { header:'رقم الصنف', key:'item_no', width:18 },
-                { header:'الاسم',     key:'name',    width:40 },
-            ],
-            rows: prods.map(p => ({ barcode: p.barcode||'', item_no: p.item_no||'', name: p.name||'' }))
-        });
-        hideProgress(); showToast(t('exportedProducts'));
+        try {
+            const prods = await new Promise(r => {
+                const tx = db.transaction("products","readonly");
+                tx.objectStore("products").getAll().onsuccess = e => r(e.target.result);
+            });
+            updateProgress(60, t('creatingFile'));
+            await exportStyledExcel({
+                fileName: `منتجات_${DATE_STR}.xlsx`,
+                sheetName: 'المنتجات',
+                columns: [
+                    { header:'الباركود',  key:'barcode', width:22 },
+                    { header:'رقم الصنف', key:'item_no', width:18 },
+                    { header:'الاسم',     key:'name',    width:40 },
+                ],
+                rows: prods.map(p => ({ barcode: p.barcode||'', item_no: p.item_no||'', name: p.name||'' }))
+            });
+            showToast(t('exportedProducts'));
+        } catch(err) {
+            showToast('❌ فشل التصدير: ' + err.message, true);
+        } finally {
+            hideProgress();
+        }
     };
 
-    document.getElementById('exportCompareBtn').onclick = () => {
+    document.getElementById('exportCompareBtn').onclick = async () => {
         showProgress(t('exportingCompare'), t('collectingData'), 10);
-        const tx = db.transaction(["inventory","stock","products"], "readonly");
-        Promise.all([
-            new Promise(r => tx.objectStore("inventory").getAll().onsuccess = e => r(e.target.result)),
-            new Promise(r => tx.objectStore("stock").getAll().onsuccess     = e => r(e.target.result)),
-            new Promise(r => tx.objectStore("products").getAll().onsuccess  = e => r(e.target.result))
-        ]).then(async ([inv, stock, prods]) => {
+        try {
+            const tx = db.transaction(["inventory","stock","products"], "readonly");
+            const [inv, stock, prods] = await Promise.all([
+                new Promise(r => tx.objectStore("inventory").getAll().onsuccess = e => r(e.target.result)),
+                new Promise(r => tx.objectStore("stock").getAll().onsuccess     = e => r(e.target.result)),
+                new Promise(r => tx.objectStore("products").getAll().onsuccess  = e => r(e.target.result))
+            ]);
             updateProgress(25, 'بناء بيانات المقارنة...');
             const allKeys = new Set([...inv.map(i => i.key), ...stock.map(s => s.key)]);
             const rows = [...allKeys].map(k => {
@@ -3117,6 +3147,16 @@
             });
 
             updateProgress(50, 'إنشاء ورقة العمل...');
+            // تحقق من تحميل ExcelJS
+            if (!window.ExcelJS) {
+                await new Promise((resolve, reject) => {
+                    let tries = 0;
+                    const check = setInterval(() => {
+                        if (window.ExcelJS) { clearInterval(check); resolve(); }
+                        else if (++tries > 50) { clearInterval(check); reject(new Error('ExcelJS لم يتحمل')); }
+                    }, 100);
+                });
+            }
             const wb  = new ExcelJS.Workbook();
             const ws  = wb.addWorksheet('المقارنة', { views:[{ rightToLeft: true }] });
 
@@ -3175,9 +3215,12 @@
             const buf  = await wb.xlsx.writeBuffer();
             const fileName = 'مقارنة_الجرد_' + new Date().toLocaleDateString('ar-SA').replace(/\//g,'-') + '.xlsx';
             downloadFile(buf, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            hideProgress();
             showToast(t('exportedCompare'));
-        });
+        } catch(err) {
+            showToast('❌ فشل التصدير: ' + err.message, true);
+        } finally {
+            hideProgress();
+        }
     };
 
     document.getElementById('globalResetBtn').onclick = () => {
