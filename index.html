@@ -8,8 +8,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+    <script src="https://unpkg.com/@zxing/browser@latest"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1138,7 +1137,7 @@
         <div class="tabs-row tabs-row-2">
             <button class="tab-btn" data-tab="tab-cmp"><i class="fas fa-chart-line"></i><span data-i18n="tabCmp">المقارنة</span></button>
             <button class="tab-btn" data-tab="tab-products"><i class="fas fa-archive"></i><span data-i18n="tabProducts">المنتجات</span></button>
-            <button class="tab-btn" data-tab="tab-prices"><i class="fas fa-tags"></i><span>الأسعار</span></button>
+            <button class="tab-btn" data-tab="tab-prices"><i class="fas fa-tags"></i><span data-i18n="tabPrices">الأسعار</span></button>
         </div>
     </div>
     <div id="tab-scan" class="panel active-pane">
@@ -1182,7 +1181,7 @@
             <!-- زر إغلاق الكاميرا — يظهر فوق الكاميرا حين تكون نشطة -->
             <!-- نافذة الكاميرا -->
             <div id="cameraDiv" class="camera-wrapper hidden" style="position:relative;">
-                <div id="reader2"></div>
+                <video id="reader2" style="width:100%;height:100%;object-fit:cover;border-radius:16px;" playsinline muted></video>
                 <!-- خط المسح المتحرك -->
                 <div id="scanLine" style="display:none; position:absolute; left:10%; right:10%; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); border-radius:2px; animation:scanAnim 1.8s ease-in-out infinite; top:50%; z-index:10; box-shadow:0 0 10px var(--accent);"></div>
             </div>
@@ -1476,85 +1475,121 @@
             <!-- بحث -->
             <div style="margin-bottom:14px;">
                 <div style="font-size:0.9rem;font-weight:700;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-                    <i class="fas fa-tags" style="color:#f59e0b;"></i> بحث الأسعار والأرصدة
+                    <i class="fas fa-tags" style="color:#f59e0b;"></i> <span data-i18n="pricesSearchTitle">بحث الأسعار والأرصدة</span>
                 </div>
                 <div style="display:flex;gap:6px;margin-bottom:8px;">
-                    <button class="prices-stab active" id="pstab-barcode" onclick="setPriceSearchType('barcode')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;">باركود</button>
-                    <button class="prices-stab" id="pstab-code" onclick="setPriceSearchType('code')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;">رقم الصنف</button>
-                    <button class="prices-stab" id="pstab-name" onclick="setPriceSearchType('name')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;">اسم المنتج</button>
+                    <button class="prices-stab active" id="pstab-barcode" onclick="setPriceSearchType('barcode')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;" data-i18n="pricesBarcode">باركود</button>
+                    <button class="prices-stab" id="pstab-code" onclick="setPriceSearchType('code')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;" data-i18n="pricesCode">رقم الصنف</button>
+                    <button class="prices-stab" id="pstab-name" onclick="setPriceSearchType('name')" style="flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;cursor:pointer;font-family:'Cairo',sans-serif;color:var(--text-muted);transition:.2s;" data-i18n="pricesName">اسم المنتج</button>
                 </div>
                 <div style="position:relative;">
                     <input class="input-field" type="text" id="prices-search-input"
-                        style="margin-bottom:0;padding-left:48px;color:#1e3a5f;font-weight:600;"
+                        style="margin-bottom:0;padding-left:88px;color:#1e3a5f;font-weight:600;"
                         placeholder="أدخل الباركود..."
                         autocomplete="off"
                         oninput="onPriceSearchInput()"
                         onkeydown="if(event.key==='Enter')doPriceSearch()">
+                    <!-- زر الكاميرا -->
+                    <button onclick="togglePricesCamera()" id="prices-cam-btn" style="position:absolute;left:52px;top:50%;transform:translateY(-50%);background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border:none;border-radius:8px;width:36px;height:36px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;" data-i18n-title="pricesCamTitle" title="فتح الكاميرا">
+                        <i class="fas fa-camera"></i>
+                    </button>
                     <button onclick="doPriceSearch()" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;border:none;border-radius:8px;width:36px;height:36px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
 
-                <!-- ── منطقة السكانر ── -->
-                <div id="ps-scanner-wrap" style="display:none;background:#000;border-radius:14px;overflow:hidden;margin-top:10px;position:relative;aspect-ratio:4/3;max-height:260px;">
-                    <video id="ps-scanner-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;border-radius:inherit;z-index:1;"></video>
-                    <div id="ps-scan-flash" style="display:none;position:absolute;inset:0;border-radius:14px;pointer-events:none;z-index:20;"></div>
-                    <div id="ps-scan-line" style="display:none;position:absolute;left:10%;right:10%;height:2px;background:linear-gradient(90deg,transparent,#f59e0b,transparent);border-radius:2px;animation:psScanAnim 1.8s ease-in-out infinite;top:50%;z-index:10;box-shadow:0 0 10px #f59e0b;"></div>
-                </div>
-
-                <!-- اختيار الكاميرا -->
-                <div id="ps-cam-row" style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-                    <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap;flex-shrink:0;">📷 الكاميرا:</span>
-                    <select id="ps-cam-select" onchange="psOnCamChange()"
-                        style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:12px;font-family:'Cairo',sans-serif;background:var(--surface2);color:var(--text);outline:none;cursor:pointer;">
-                        <option value="">⏳ جاري التحميل...</option>
-                    </select>
-                    <button onclick="psLoadCameraList()" title="تحديث" style="background:rgba(245,158,11,0.1);border:1.5px solid rgba(245,158,11,0.3);border-radius:9px;padding:7px 10px;font-size:14px;cursor:pointer;color:#f59e0b;flex-shrink:0;">🔄</button>
-                </div>
-
-                <!-- أزرار السكانر -->
-                <div style="display:flex;gap:8px;margin-top:8px;">
-                    <button id="ps-toggle-btn" onclick="psToggleScanner()"
-                        style="flex:1;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;">
-                        <i class="fas fa-camera"></i> تشغيل السكانر
-                    </button>
-                    <button onclick="psClearSearch()"
-                        style="padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:12px;cursor:pointer;">
-                        🗑️ مسح
+                <!-- منطقة الكاميرا للأسعار -->
+                <div id="prices-camera-area" style="display:none;margin-top:10px;">
+                    <!-- اختيار الكاميرا + تبديل -->
+                    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+                        <select id="prices-cam-select" style="flex:2;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Cairo',sans-serif;font-size:0.8rem;">
+                            <option value="">تحميل الكاميرات...</option>
+                        </select>
+                        <button onclick="switchPricesCamera()" style="flex-shrink:0;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);cursor:pointer;" title="تبديل الكاميرا">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <!-- نافذة الكاميرا -->
+                    <div style="position:relative;border-radius:16px;overflow:hidden;background:#000;width:100%;max-width:340px;margin:0 auto 8px;">
+                        <video id="prices-reader" style="width:100%;height:260px;object-fit:cover;" playsinline muted></video>
+                        <!-- خط المسح -->
+                        <div id="prices-scan-line" style="position:absolute;left:8%;right:8%;height:2px;background:linear-gradient(90deg,transparent,#f59e0b,transparent);border-radius:2px;animation:scanAnim 1.8s ease-in-out infinite;top:50%;z-index:10;box-shadow:0 0 10px rgba(245,158,11,0.7);pointer-events:none;"></div>
+                    </div>
+                    <!-- حالة السكانر -->
+                    <div id="prices-scan-status" style="text-align:center;font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;padding:6px 12px;background:var(--surface2);border-radius:8px;">
+                        🎯 وجّه الكاميرا نحو الباركود
+                    </div>
+                    <!-- زر الإغلاق -->
+                    <button onclick="closePricesCamera()" style="width:100%;padding:10px;border-radius:12px;border:none;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;font-family:'Cairo',sans-serif;font-size:0.85rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                        <i class="fas fa-times-circle"></i> <span data-i18n="pricesCamClose">إغلاق الكاميرا</span>
                     </button>
                 </div>
-
-                <style>
-                @keyframes psScanAnim {
-                    0%   { top:20%; opacity:.6; }
-                    50%  { top:80%; opacity:1;  }
-                    100% { top:20%; opacity:.6; }
-                }
-                @keyframes psScanFlash {
-                    0%   { background:rgba(245,158,11,0); }
-                    40%  { background:rgba(245,158,11,0.45); }
-                    100% { background:rgba(245,158,11,0); }
-                }
-                </style>
 
                 <div id="prices-result-area" style="margin-top:12px;"></div>
-
-            </div><!-- end search div margin-bottom:14px -->
+            </div>
 
             <!-- قائمة المنتجات وبحث فيها -->
             <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:14px;">
                 <div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-                    <i class="fas fa-list" style="color:#f59e0b;"></i> قائمة المنتجات
+                    <i class="fas fa-list" style="color:#f59e0b;"></i> <span data-i18n="pricesListTitle">قائمة المنتجات</span>
                     <span id="prices-list-count" style="background:rgba(245,158,11,0.1);color:#f59e0b;border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:1px 10px;font-size:0.75rem;margin-right:4px;">0</span>
                 </div>
                 <input class="input-field search-input" type="text" id="prices-list-search"
                     placeholder="🔍 ابحث باسم المنتج أو الصنف أو الباركود..."
                     style="margin-bottom:8px;"
                     oninput="filterPricesList()">
+                <div id="prices-sync-status" style="font-size:0.72rem;color:var(--accent);text-align:center;margin-bottom:4px;min-height:16px;"></div>
                 <div id="prices-product-list" style="max-height:340px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--surface3) transparent;"></div>
                 <button id="prices-load-more-btn" onclick="loadMorePrices()" style="display:none;width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--accent);font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;">تحميل المزيد</button>
             </div>
         </div>
+
+
+
+        <div class="card" style="margin-top:0;">
+            <div style="font-weight:700;margin-bottom:12px;font-size:0.9rem;display:flex;align-items:center;gap:8px;">
+                <i class="fas fa-plus-circle" style="color:#f59e0b;"></i> إضافة / تعديل منتج يدوياً
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div>
+                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">الباركود</label>
+                    <input class="input-field" type="text" id="pf-barcode" placeholder="الباركود" inputmode="numeric" style="margin-bottom:0;">
+                </div>
+                <div>
+                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">رقم الصنف *</label>
+                    <input class="input-field" type="text" id="pf-code" placeholder="رقم الصنف" style="margin-bottom:0;">
+                </div>
+            </div>
+            <div style="margin-bottom:8px;">
+                <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">اسم المنتج *</label>
+                <input class="input-field" type="text" id="pf-name" placeholder="اسم المنتج بالعربي" style="margin-bottom:0;direction:rtl;">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+                <div>
+                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">السعر الأصلي</label>
+                    <input class="input-field" type="number" id="pf-orig" placeholder="0" inputmode="decimal" oninput="calcPriceDiscount()" style="margin-bottom:0;">
+                </div>
+                <div>
+                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">سعر الخصم</label>
+                    <input class="input-field" type="number" id="pf-sale" placeholder="0" inputmode="decimal" oninput="calcPriceDiscount()" style="margin-bottom:0;">
+                </div>
+                <div>
+                    <label style="font-size:11px;color:var(--text-muted);margin-bottom:3px;display:block;">الرصيد</label>
+                    <input class="input-field" type="number" id="pf-stock" placeholder="0" inputmode="numeric" min="0" style="margin-bottom:0;">
+                </div>
+            </div>
+            <div id="pf-discount-preview" style="text-align:center;font-size:12px;color:var(--negative);margin-bottom:10px;display:none;">نسبة الخصم: <strong id="pf-disc-val">0%</strong></div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-primary" onclick="savePriceProduct()" style="background:linear-gradient(135deg,#b45309,#f59e0b);">
+                    <i class="fas fa-save"></i> حفظ المنتج
+                </button>
+                <button class="btn-secondary" onclick="clearPriceForm()" style="flex:0 0 auto;width:auto;padding:13px 18px;">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+            <div id="pf-success" style="display:none;margin-top:10px;padding:10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;text-align:center;font-size:13px;color:var(--accent);">✅ تم الحفظ بنجاح!</div>
+        </div>
+
 
     </div>
     <!-- ══ نهاية تبويب الأسعار ══ -->
@@ -1582,7 +1617,7 @@
         <div id="productsTableContainer" class="data-wrapper"></div>
         <button id="clearProductsBtn" class="btn-secondary" style="margin-top:12px;"><span data-i18n="clearProducts">مسح كل المنتجات</span></button>
     </div></div>
-    </div><!-- end app-container -->
+</div>
 <!-- نافذة تعيين الأعمدة -->
 <div id="colMapModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);justify-content:center;align-items:flex-start;z-index:5000;padding:10px;overflow-y:auto;">
   <div style="background:var(--surface);border-radius:24px;padding:24px 20px 20px;width:100%;max-width:520px;border:1px solid rgba(99,102,241,0.3);box-shadow:0 30px 80px rgba(0,0,0,0.8);position:relative;margin:20px auto;min-height:min-content;">
@@ -1614,6 +1649,10 @@
         <input type="text" id="modalName" data-i18n-placeholder="modalName" placeholder="الاسم *" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;">
         <input type="text" id="modalBarcode" data-i18n-placeholder="modalBarcode" placeholder="الباركود (اختياري)" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;">
         <input type="number" id="modalQty" data-i18n-placeholder="modalQty" placeholder="كمية مرجعية" value="0" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;">
+        <div style="display:flex;gap:10px;margin-bottom:0;">
+            <input type="number" id="modalOrigPrice" placeholder="السعر الأصلي" inputmode="decimal" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;">
+            <input type="number" id="modalSalePrice" placeholder="سعر الخصم" inputmode="decimal" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;">
+        </div>
         <div style="display:flex; gap:12px; margin-top:12px;">
             <button id="saveProductBtn" style="background:linear-gradient(135deg,#0891b2,#06b6d4); color:#fff; border:none; padding:12px; border-radius:10px; flex:1; font-weight:800; font-family:'Cairo',sans-serif; cursor:pointer;" data-i18n="save">حفظ</button>
             <button id="closeModalBtn" style="background:var(--surface2); color:var(--text); border:none; padding:12px; border-radius:10px; flex:1; cursor:pointer; font-family:'Cairo',sans-serif;" data-i18n="cancel">إلغاء</button>
@@ -1955,8 +1994,8 @@
                 { id: 'barcode', label: t('thBarcode'),  icon: 'fas fa-barcode',     color: 'var(--accent2)',    required: false, keywords: ['باركود','barcode','بار','كود'] },
                 { id: 'itemno',  label: t('thItemNo'),   icon: 'fas fa-hashtag',     color: 'var(--accent)',     required: false, keywords: ['رقم الصنف','رقم','item','صنف'] },
                 { id: 'name',    label: t('thName'),     icon: 'fas fa-tag',         color: 'var(--text-muted)', required: false, keywords: ['اسم','name','وصف','desc','المادة'] },
-                { id: 'price_orig', label: 'السعر الأصلي', icon: 'fas fa-money-bill', color: '#9ca3af', required: false, keywords: ['أصلي','original','سعر قبل','سعر أصلي','سعر1'] },
-                { id: 'price_sale', label: 'سعر الخصم',   icon: 'fas fa-tags',       color: '#f59e0b', required: false, keywords: ['خصم','sale','بعد','صافي','net','سعر بعد','سعر2'] },
+                { id: 'orig',    label: 'السعر الأصلي',  icon: 'fas fa-tag',         color: '#f59e0b',           required: false, keywords: ['سعر أصلي','السعر الأصلي','orig','price','سعر البيع'] },
+                { id: 'sale',    label: 'سعر الخصم',     icon: 'fas fa-percent',     color: '#10b981',           required: false, keywords: ['خصم','sale','بعد الخصم','سعر الخصم','discount'] },
             ],
             async function(colMap) {
                 if (colMap.barcode === null && colMap.itemno === null) { showToast(t('selectBarcodeOrItem'), true); return; }
@@ -1967,6 +2006,8 @@
                     const c2 = db.transaction("uploadedFiles","readwrite"); c2.objectStore("uploadedFiles").clear(); await new Promise(r=>{ c2.oncomplete=r; });
                 }
                 const sourceId = Date.now(); let totalAdded = 0;
+                // لجمع بيانات الأسعار لتبويب الأسعار
+                // الأسعار تُقرأ من IndexedDB تلقائياً بعد الرفع
                 for (let fi = 0; fi < pendingProductFiles.length; fi++) {
                     const file = pendingProductFiles[fi];
                     try {
@@ -1982,13 +2023,14 @@
                             const tx = db.transaction(["products"], "readwrite"); const store = tx.objectStore("products");
                             for (const row of batch) {
                                 if (!Array.isArray(row)) continue;
-                                const barcode = colMap.barcode !== null ? String(row[colMap.barcode]||'').trim().replace(/\.0+$/,'') : '';
-                                const itemno  = colMap.itemno  !== null ? String(row[colMap.itemno] ||'').trim().replace(/\.0+$/,'') : '';
-                                const name    = colMap.name    !== null ? String(row[colMap.name]   ||'').trim() : '';
-                                const price_orig = colMap.price_orig !== null && colMap.price_orig !== undefined ? (parseFloat(row[colMap.price_orig]) || 0) : 0;
-                                const price_sale = colMap.price_sale !== null && colMap.price_sale !== undefined ? (parseFloat(row[colMap.price_sale]) || price_orig) : price_orig;
+                                const barcode  = colMap.barcode !== null ? String(row[colMap.barcode]||'').trim().replace(/\.0+$/,'') : '';
+                                const itemno   = colMap.itemno  !== null ? String(row[colMap.itemno] ||'').trim().replace(/\.0+$/,'') : '';
+                                const name     = colMap.name    !== null ? String(row[colMap.name]   ||'').trim() : '';
+                                const origVal  = colMap.orig    !== null ? parseFloat(row[colMap.orig])  || 0 : 0;
+                                const saleVal  = colMap.sale    !== null ? parseFloat(row[colMap.sale])  || origVal : origVal;
                                 if (!barcode && !itemno) continue;
-                                store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name || 'بدون اسم', price_orig, price_sale, sourceId }); totalAdded++;
+                                store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name || 'بدون اسم', orig_price: origVal, sale_price: saleVal, sourceId }); totalAdded++;
+
                             }
                             await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
                         }
@@ -1997,8 +2039,11 @@
                 const ftx = db.transaction("uploadedFiles","readwrite");
                 ftx.objectStore("uploadedFiles").add({ names: pendingProductFiles.map(f=>f.name).join(', '), count: totalAdded, sourceId });
                 await new Promise(r=>{ ftx.oncomplete=r; });
+                // تحديث تبويب الأسعار بالأسعار الجديدة
                 hideProgress(); showToast(`✅ ${t(dbUploadMode==='update'?'updateWord':'mergeWord')} ${totalAdded} ${t('thName')==='Name'?'products':'منتج'}`);
                 pendingProductFiles = []; updateAllUI(["prods"]);
+                // تحديث تبويب الأسعار من IndexedDB مباشرة
+                setTimeout(() => syncPricesFromDB(true), 200);
             }
         );
         } // end _proceedWithColMap
@@ -2155,6 +2200,8 @@
                 showToast(t('stockUpdated'));
                 pendingStockFiles = [];
                 updateAllUI(["stock","cmpRows"]);
+                // مزامنة الرصيد تلقائياً مع تبويب الأسعار
+                setTimeout(() => syncPricesFromDB(true), 300);
             }
         );
     }
@@ -2298,97 +2345,85 @@
         });
     };
 
-    // ── كاميرا محسّنة ──
+    // ══════════════════════════════════════════════════
+    //  سكانر الجرد — @zxing/browser (ZXingBrowser)
+    // ══════════════════════════════════════════════════
+    let _zxControls  = null;
+    let _zxLastScan  = 0;
+    let _mainScanDelay = 1200;
+
     async function listCameras() {
         try {
-            const devices = await Html5Qrcode.getCameras();
-            availableCameras = devices;
+            const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+            availableCameras = devices.map(d => ({ id: d.deviceId, label: d.label }));
             const select = document.getElementById('cameraSelect');
             select.innerHTML = '<option value="">اختر الكاميرا</option>';
-            devices.forEach((device, idx) => {
+            availableCameras.forEach((device, idx) => {
                 const option = document.createElement('option');
                 option.value = device.id;
-                option.textContent = device.label || `كاميرا ${idx + 1}`;
+                option.textContent = device.label || ('كاميرا ' + (idx + 1));
                 select.appendChild(option);
             });
-            if (devices.length > 0) {
-                // استعادة الكاميرا المحفوظة أولاً
+            if (availableCameras.length > 0) {
                 const savedCamId = await loadSetting('invSelectedCamera', '');
-                let selectedCam = savedCamId
-                    ? devices.find(d => d.id === savedCamId)
-                    : null;
-                // الأولوية: الكاميرا رقم 3 (index 2)، ثم الخلفية، ثم الأخيرة
-                if (!selectedCam) {
-                    selectedCam = devices[2]   // كاميرا 3
-                        || devices.find(d => /back|rear|خلفية|environment/i.test(d.label))
-                        || devices[devices.length - 1];
-                }
-                currentCameraId = selectedCam.id;
+                let sel2 = savedCamId ? availableCameras.find(d => d.id === savedCamId) : null;
+                if (!sel2) sel2 = availableCameras[2]
+                    || availableCameras.find(d => /back|rear|environment/i.test(d.label || ''))
+                    || availableCameras[availableCameras.length - 1];
+                currentCameraId = sel2.id;
                 select.value = currentCameraId;
             }
-            // تحديث select عند التغيير وحفظه
             select.onchange = () => {
                 currentCameraId = select.value;
                 saveSetting('invSelectedCamera', currentCameraId);
             };
-        } catch (err) { console.warn(err); }
+        } catch (err) { console.warn('listCameras:', err); }
+    }
+
+    async function _stopMainStream() {
+        if (_zxControls) { try { _zxControls.stop(); } catch(e){} _zxControls = null; }
+        const vid = document.getElementById('reader2');
+        if (vid && vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; }
     }
 
     async function startCamera(cameraId = null) {
-        if (html5QrScanner) { await html5QrScanner.stop().catch(() => {}); html5QrScanner = null; }
+        await _stopMainStream();
         scanningActive = false;
         const cameraDiv = document.getElementById('cameraDiv');
-        const scanLine = document.getElementById('scanLine');
+        const scanLine  = document.getElementById('scanLine');
         cameraDiv.classList.remove('hidden');
         setScanStatus('scanning', 'جاري تشغيل الكاميرا...');
         try {
-            const targetId = cameraId || currentCameraId || (availableCameras[0]?.id);
-            if (!targetId) throw new Error("لا توجد كاميرا متاحة");
-            html5QrScanner = new Html5Qrcode("reader2");
-            await html5QrScanner.start(
-                { deviceId: { exact: targetId } },
-                {
-                    fps: 30,
-                    disableFlip: false,
-                    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-                    formatsToSupport: [
-                        Html5QrcodeSupportedFormats?.EAN_13,
-                        Html5QrcodeSupportedFormats?.EAN_8,
-                        Html5QrcodeSupportedFormats?.UPC_A,
-                        Html5QrcodeSupportedFormats?.UPC_E,
-                        Html5QrcodeSupportedFormats?.CODE_128,
-                        Html5QrcodeSupportedFormats?.CODE_39,
-                        Html5QrcodeSupportedFormats?.CODE_93,
-                        Html5QrcodeSupportedFormats?.ITF,
-                        Html5QrcodeSupportedFormats?.CODABAR,
-                    ].filter(Boolean)
-                },
-                async (decoded) => {
-                    onCameraScan(decoded);
-                    // عرض الكود المقروء في الحقل للمراجعة
-                    const code = sanitizeBarcode(decoded);
-                    if (code) document.getElementById('barcodeInput').value = code;
-                },
-                () => {} // خطأ مسح عادي، تجاهل
-            );
+            const targetId = cameraId || currentCameraId || undefined;
+            const videoEl  = document.getElementById('reader2');
+            const codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+            _zxControls = await codeReader.decodeFromVideoDevice(targetId, videoEl, (result, err) => {
+                if (!result) return;
+                const now = Date.now();
+                if (now - _zxLastScan < _mainScanDelay) return;
+                _zxLastScan = now;
+                const decoded = result.getText();
+                onCameraScan(decoded);
+                const code = sanitizeBarcode(decoded);
+                if (code) document.getElementById('barcodeInput').value = code;
+            });
             scanningActive = true;
-            currentCameraId = targetId;
             if (scanLine) scanLine.style.display = 'block';
             document.getElementById('closeCamBtn').style.display = 'flex';
             setScanStatus('ready', t('cameraActive'));
             initAudio();
         } catch (err) {
-            showToast(t('cameraError') + err.message, true);
+            console.error('startCamera:', err);
+            showToast(t('cameraError') + ' ' + err.message, true);
             cameraDiv.classList.add('hidden');
             if (scanLine) scanLine.style.display = 'none';
             document.getElementById('closeCamBtn').style.display = 'none';
             setScanStatus('idle', 'فشل تشغيل الكاميرا');
-            scanningActive = false;
         }
     }
 
     async function closeCamera() {
-        if (html5QrScanner) { await html5QrScanner.stop().catch(() => {}); html5QrScanner = null; }
+        await _stopMainStream();
         scanningActive = false;
         document.getElementById('cameraDiv').classList.add('hidden');
         document.getElementById('closeCamBtn').style.display = 'none';
@@ -2400,22 +2435,27 @@
     async function switchCamera() {
         if (!availableCameras.length) await listCameras();
         if (availableCameras.length < 2) { showToast(t('noCameraOther'), true); return; }
-        const currentIndex = availableCameras.findIndex(c => c.id === currentCameraId);
-        const nextIndex = (currentIndex + 1) % availableCameras.length;
-        const nextCam = availableCameras[nextIndex];
-        document.getElementById('cameraSelect').value = nextCam.id;
-        currentCameraId = nextCam.id;
+        const idx  = availableCameras.findIndex(c => c.id === currentCameraId);
+        const next = availableCameras[(idx + 1) % availableCameras.length];
+        document.getElementById('cameraSelect').value = next.id;
+        currentCameraId = next.id;
         saveSetting('invSelectedCamera', currentCameraId);
-        await startCamera(nextCam.id);
+        await startCamera(next.id);
+    }
+
+    const scanDelaySlider = document.getElementById('scanDelaySlider');
+    if (scanDelaySlider) {
+        _mainScanDelay = Math.round(parseFloat(scanDelaySlider.value) * 1000);
+        scanDelaySlider.addEventListener('input', function() {
+            _mainScanDelay = Math.round(parseFloat(this.value) * 1000);
+        });
     }
 
     document.getElementById('startCamBtn').onclick = async () => {
         initAudio();
         if (!availableCameras.length) await listCameras();
-        const selected = document.getElementById('cameraSelect').value;
-        const targetId = selected || currentCameraId || (availableCameras[0]?.id);
-        if (targetId) await startCamera(targetId);
-        else showToast(t('noCamera'), true);
+        const sel = document.getElementById('cameraSelect').value;
+        await startCamera(sel || currentCameraId || undefined);
     };
     document.getElementById('switchCamBtn').onclick = switchCamera;
     document.getElementById('closeCamBtn').onclick = closeCamera;
@@ -2742,18 +2782,30 @@
             document.getElementById('totalProductsStat').innerText = prods.length;
             const prodsHdr = `<div style="display:flex;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.75rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;gap:8px;">
                 <span style="flex:1;">${t('thItemNo')} · ${t('thName')}</span>
+                <span style="min-width:80px;text-align:center;">السعر</span>
                 <span style="min-width:52px;text-align:center;">${t('thAction')}</span>
             </div>`;
             const vl = _getOrCreateVL('productsTableContainer', {
-                rowHeight: 58,
-                renderRow: (p) => `<div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);gap:8px;min-height:58px;">
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-size:0.76rem;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.item_no||p.barcode||'-')}</div>
-                        <div style="font-size:0.72rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(p.name||'-')}</div>
-                        <div style="font-size:0.64rem;color:var(--text-dim);margin-top:1px;">${escapeHtml(p.barcode||'')}</div>
-                    </div>
-                    <button class="icon-btn" onclick="window.deleteProductById('${p.id}')" style="flex-shrink:0;font-size:0.7rem;padding:5px 10px;">${t('deleteBtn')}</button>
-                </div>`
+                rowHeight: 64,
+                renderRow: (p) => {
+                    const orig = parseFloat(p.orig_price) || 0;
+                    const sale = parseFloat(p.sale_price) || orig;
+                    const priceHtml = orig > 0
+                        ? `<div style="flex-shrink:0;min-width:80px;text-align:center;">
+                            <div style="font-size:0.78rem;font-weight:700;color:#f59e0b;">${sale}</div>
+                            ${orig !== sale ? `<div style="font-size:0.62rem;color:var(--text-dim);text-decoration:line-through;">${orig}</div>` : ''}
+                           </div>`
+                        : `<div style="flex-shrink:0;min-width:80px;text-align:center;color:var(--text-dim);font-size:0.68rem;">—</div>`;
+                    return `<div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);gap:8px;min-height:64px;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:0.76rem;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.item_no||p.barcode||'-')}</div>
+                            <div style="font-size:0.72rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(p.name||'-')}</div>
+                            <div style="font-size:0.64rem;color:var(--text-dim);margin-top:1px;">${escapeHtml(p.barcode||'')}</div>
+                        </div>
+                        ${priceHtml}
+                        <button class="icon-btn" onclick="window.deleteProductById('${p.id}')" style="flex-shrink:0;font-size:0.7rem;padding:5px 10px;">${t('deleteBtn')}</button>
+                    </div>`;
+                }
             }, prodsHdr);
             vl.setItems(prods);
         }
@@ -2774,12 +2826,6 @@
             requestIdleCallback(() => _renderTab(tab), { timeout: 300 });
         } else {
             setTimeout(() => _renderTab(tab), 0);
-        }
-        // تحديث فهرس الأسعار إذا تغيرت المنتجات أو المرجع
-        if (!dirtyStores || dirtyStores.some(s => ['prods','stock'].includes(s))) {
-            if (typeof refreshPricesList === 'function') {
-                setTimeout(() => refreshPricesList(), 200);
-            }
         }
     }
 
@@ -3194,12 +3240,24 @@
     document.getElementById('closeModalBtn').onclick = () => document.getElementById('productModal').style.display = 'none';
     document.getElementById('saveProductBtn').onclick = async () => {
         let itemNo = document.getElementById('modalItemNo').value.trim(), name = document.getElementById('modalName').value.trim(), barcode = document.getElementById('modalBarcode').value.trim(), qty = parseFloat(document.getElementById('modalQty').value)||0;
+        const origPrice = parseFloat(document.getElementById('modalOrigPrice').value) || 0;
+        const salePrice = parseFloat(document.getElementById('modalSalePrice').value) || origPrice;
         if ((!itemNo && !barcode) || !name) { alert("يرجى ملء الحقول الأساسية"); return; }
         const tx = db.transaction(["products","stock"], "readwrite");
-        tx.objectStore("products").add({ id: generateUniqueId(), item_no: itemNo, barcode, name, sourceId: "manual" });
+        tx.objectStore("products").add({ id: generateUniqueId(), item_no: itemNo, barcode, name, orig_price: origPrice, sale_price: salePrice, sourceId: "manual" });
         if (qty>0) tx.objectStore("stock").put({ key: itemNo||barcode, name, qty });
         await new Promise(r=>{ tx.oncomplete=r; });
         document.getElementById('productModal').style.display='none';
+        // مزامنة الأسعار تلقائياً عند إضافة منتج بسعر
+        if (origPrice > 0 || salePrice > 0) {
+            const code = itemNo || barcode;
+            const disc = origPrice > 0 ? Math.round((origPrice - salePrice) / origPrice * 100) : 0;
+            const barcodes = barcode ? [barcode] : [];
+            PRICES_PRODUCTS[code] = { c: code, n: name, o: origPrice, s: salePrice, d: disc, barcodes };
+
+            rebuildPricesIndex();
+            refreshPricesList();
+        }
         updateAllUI(["prods","stock","cmpRows"]); showToast(t('productAdded'));
     };
     document.getElementById('stockUploadArea').addEventListener('click',()=>document.getElementById('stockFileInput').click());
@@ -3405,10 +3463,8 @@
         let target = this.getAttribute('data-tab');
         // أغلق الكاميرا فوراً عند مغادرة تبويب المسح
         if (target !== 'tab-scan') {
-            if (html5QrScanner) {
-                html5QrScanner.stop().catch(() => {});
-                html5QrScanner = null;
-            }
+            // أوقف الكاميرا الرئيسية
+            if (typeof _stopMainStream === 'function') _stopMainStream();
             scanningActive = false;
             const scanLine = document.getElementById('scanLine');
             if (scanLine) scanLine.style.display = 'none';
@@ -3417,6 +3473,10 @@
             const closeCamBtn = document.getElementById('closeCamBtn');
             if (closeCamBtn) closeCamBtn.style.display = 'none';
             setScanStatus('idle', 'اضغط فتح لبدء المسح');
+        }
+        // أغلق كاميرا الأسعار عند مغادرة تبويبها
+        if (target !== 'tab-prices' && typeof closePricesCamera === 'function') {
+            closePricesCamera();
         }
         document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
         this.classList.add('active');
@@ -3429,7 +3489,7 @@
     function initDB() {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = (e) => {
-            db = e.target.result; window.db = db;
+            db = e.target.result;
             if (!db.objectStoreNames.contains("products")) db.createObjectStore("products", { keyPath: "id", autoIncrement: false });
             if (!db.objectStoreNames.contains("inventory")) db.createObjectStore("inventory", { keyPath: "key" });
             if (!db.objectStoreNames.contains("stock")) db.createObjectStore("stock", { keyPath: "key" });
@@ -3440,7 +3500,7 @@
             }
             if (!db.objectStoreNames.contains("settings")) db.createObjectStore("settings", { keyPath: "k" });
         };
-        req.onsuccess = (e) => { db = e.target.result; window.db = db; updateAllUI(); listCameras(); };
+        req.onsuccess = (e) => { db = e.target.result; updateAllUI(); listCameras(); };
         req.onerror = (e) => console.error(e);
     }
     // ══════════════════════════════════════════════
@@ -3672,6 +3732,27 @@
             stockModeMergeDesc: 'دمج: يجمع الكميات مع المرجع الموجود',
             dbModeUpdateDesc: 'تحديث: يحذف المنتجات القديمة ويستبدلها بالجديدة',
             dbModeMergeDesc: 'دمج: يُضيف المنتجات الجديدة مع الحفاظ على الموجودة',
+            // ── تبويب الأسعار ──
+            tabPrices: 'الأسعار',
+            pricesSearchTitle: 'بحث الأسعار والأرصدة',
+            pricesBarcode: 'باركود',
+            pricesCode: 'رقم الصنف',
+            pricesName: 'اسم المنتج',
+            pricesPlaceholder: 'أدخل الباركود...',
+            pricesCamTitle: 'فتح الكاميرا',
+            pricesCamClose: 'إغلاق الكاميرا',
+            pricesCamStatus: 'وجّه الكاميرا نحو الباركود',
+            pricesCamLoading: '⏳ جاري تحميل الكاميرا...',
+            pricesSyncTitle: 'مزامنة بيانات الأسعار والأرصدة',
+            pricesSyncInfo: 'يتم جلب الأسعار (الأصلي + الخصم) من تبويب المنتجات، والرصيد من تبويب المرجع تلقائياً',
+            pricesSyncBtn: 'مزامنة من المنتجات والمرجع',
+            pricesListTitle: 'قائمة المنتجات',
+            pricesOrigPrice: 'السعر الأصلي',
+            pricesSalePrice: 'سعر الخصم',
+            pricesStock: 'الرصيد',
+            pricesDiscount: 'الخصم',
+            pricesUnit: 'قطعة',
+            pricesNotFound: 'لا توجد نتائج',
         },
         en: {
             appTitle: 'Smart Inventory System',
@@ -3830,6 +3911,27 @@
             stockModeMergeDesc: 'Merge: combines quantities with existing reference',
             dbModeUpdateDesc: 'Replace: deletes existing products and replaces with new',
             dbModeMergeDesc: 'Merge: adds new products while keeping existing ones',
+            // ── Prices Tab ──
+            tabPrices: 'Prices',
+            pricesSearchTitle: 'Price & Stock Search',
+            pricesBarcode: 'Barcode',
+            pricesCode: 'Item No.',
+            pricesName: 'Product Name',
+            pricesPlaceholder: 'Enter barcode...',
+            pricesCamTitle: 'Open Camera',
+            pricesCamClose: 'Close Camera',
+            pricesCamStatus: 'Point camera at barcode',
+            pricesCamLoading: '⏳ Loading camera...',
+            pricesSyncTitle: 'Sync Prices & Stock',
+            pricesSyncInfo: 'Prices (original + discount) are pulled from Products tab, stock from Reference tab automatically',
+            pricesSyncBtn: 'Sync from Products & Reference',
+            pricesListTitle: 'Product List',
+            pricesOrigPrice: 'Original Price',
+            pricesSalePrice: 'Sale Price',
+            pricesStock: 'Stock',
+            pricesDiscount: 'Discount',
+            pricesUnit: 'pcs',
+            pricesNotFound: 'No results found',
         }
     };
 
@@ -3846,6 +3948,10 @@
         document.getElementById('langToggleLabel').textContent = isEn ? 'AR' : 'EN';
 
         // تحديث كل العناصر الثابتة
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            const key = el.getAttribute('data-i18n-title');
+            if (translations[lang] && translations[lang][key]) el.setAttribute('title', translations[lang][key]);
+        });
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
             el.textContent = t(key);
@@ -3887,72 +3993,83 @@
 <!-- ══════════════════════════════════════════════ -->
 <!-- تبويب الأسعار والأرصدة — JavaScript كامل      -->
 <!-- ══════════════════════════════════════════════ -->
+<!-- Modal تعيين أعمدة الأسعار -->
+<div class="modal-overlay" id="prices-col-map-modal" onclick="if(event.target===this)closePricesColMap()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);z-index:6000;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;font-family:'Cairo',sans-serif;">
+    <button onclick="closePricesColMap()" style="float:left;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">✕</button>
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:#f59e0b;">📊 تعيين أعمدة ملف الأسعار</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;line-height:1.5;">اختر العمود المقابل لكل حقل. صف المعاينة من الملف الفعلي.</div>
+    <div id="prices-col-preview" style="background:var(--surface2);border-radius:8px;padding:8px;margin-bottom:14px;overflow-x:auto;"></div>
+    <div id="prices-col-fields" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="confirmPricesColMap()" style="flex:2;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">✅ تأكيد ورفع</button>
+      <button onclick="closePricesColMap()" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:14px;cursor:pointer;">إلغاء</button>
+    </div>
+    <div id="prices-col-error" style="margin-top:8px;font-size:12px;color:var(--negative);text-align:center;display:none;"></div>
+  </div>
+</div>
+
+<!-- Modal تعيين أعمدة رصيد الأسعار -->
+<div class="modal-overlay" id="prices-stk-map-modal" onclick="if(event.target===this)closePricesStkMap()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);z-index:6000;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;font-family:'Cairo',sans-serif;">
+    <button onclick="closePricesStkMap()" style="float:left;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">✕</button>
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:#3b82f6;">📦 تعيين أعمدة ملف الرصيد</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;line-height:1.5;">اختر العمود المقابل لكل حقل.</div>
+    <div id="prices-stk-preview" style="background:var(--surface2);border-radius:8px;padding:8px;margin-bottom:14px;overflow-x:auto;"></div>
+    <div style="margin-bottom:10px;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;"><span style="color:var(--negative);">*</span> رقم الصنف</label>
+        <select id="ps-smap-code" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:'Cairo',sans-serif;background:var(--surface2);color:var(--text);outline:none;"></select>
+    </div>
+    <div style="margin-bottom:10px;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">اسم الصنف (اختياري)</label>
+        <select id="ps-smap-name" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:'Cairo',sans-serif;background:var(--surface2);color:var(--text);outline:none;"></select>
+    </div>
+    <div style="margin-bottom:16px;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;"><span style="color:var(--negative);">*</span> الرصيد (الفعلي النهائي)</label>
+        <select id="ps-smap-qty" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:'Cairo',sans-serif;background:var(--surface2);color:var(--text);outline:none;"></select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="confirmPricesStkMap()" style="flex:2;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">✅ تأكيد ورفع</button>
+      <button onclick="closePricesStkMap()" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:14px;cursor:pointer;">إلغاء</button>
+    </div>
+    <div id="prices-stk-error" style="margin-top:8px;font-size:12px;color:var(--negative);text-align:center;display:none;"></div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════════════
-//  نظام الأسعار والأرصدة — يقرأ من IndexedDB مباشرةً
+//  نظام الأسعار والأرصدة — مدمج في ملف الجرد
 // ══════════════════════════════════════════════════════
 
-// خرائط البحث (تُبنى من IndexedDB)
-let PR_CODE_MAP    = {};  // item_no -> index in PR_LIST
+// بيانات المنتجات (مخزّنة في localStorage)
+// تبويب الأسعار يقرأ مباشرة من IndexedDB — بدون localStorage
+let PRICES_PRODUCTS   = {};   // { code: { c, n, o, s, d, stk, barcodes:[] } }
+let PRICES_STOCK_DATA = {};   // { code: qty }
+
+// بناء خرائط البحث
+let PR_CODE_MAP    = {};  // code -> index in PR_LIST
 let PR_BARCODE_MAP = {};  // barcode -> index in PR_LIST
 let PR_LIST        = []; // [code, name, orig, sale, disc, stock]
 
-async function rebuildPricesIndex() {
+function rebuildPricesIndex() {
     PR_CODE_MAP    = {};
     PR_BARCODE_MAP = {};
     PR_LIST        = [];
-
-    const db = await getPricesDB();
-    if (!db) return;
-
-    const prods = await new Promise(r => {
-        const tx = db.transaction('products', 'readonly');
-        tx.objectStore('products').getAll().onsuccess = e => r(e.target.result);
-    });
-
-    const stockArr = await new Promise(r => {
-        const tx = db.transaction('stock', 'readonly');
-        tx.objectStore('stock').getAll().onsuccess = e => r(e.target.result);
-    });
-    const stockMap = {};
-    stockArr.forEach(s => { stockMap[s.key] = s.qty; });
-
-    prods.forEach(p => {
-        const code = p.item_no || p.barcode;
-        if (!code) return;
-        const name = p.name || code;
-        const orig = parseFloat(p.price_orig) || 0;
-        const sale = parseFloat(p.price_sale) || orig;
-        const disc = orig > 0 ? Math.round((orig - sale) / orig * 100) : 0;
-        const stk  = stockMap[p.item_no] !== undefined ? stockMap[p.item_no]
-                   : stockMap[p.barcode] !== undefined ? stockMap[p.barcode] : null;
-        const idx  = PR_LIST.length;
-        PR_LIST.push([code, name, orig, sale, disc, stk]);
-        if (p.item_no)  PR_CODE_MAP[p.item_no]    = idx;
-        if (p.barcode)  PR_CODE_MAP[p.barcode]     = idx;
-        if (p.barcode)  PR_BARCODE_MAP[p.barcode]  = idx;
-        if (p.item_no && p.barcode && p.item_no !== p.barcode)
-            PR_BARCODE_MAP[p.barcode] = idx;
+    Object.values(PRICES_PRODUCTS).forEach(p => {
+        if (!p.c) return;
+        const orig  = parseFloat(p.o) || 0;
+        const sale  = parseFloat(p.s) !== undefined ? parseFloat(p.s) : orig;
+        const disc  = p.d !== undefined ? p.d : (orig > 0 ? Math.round((orig - sale) / orig * 100) : 0);
+        const stk   = PRICES_STOCK_DATA[p.c] !== undefined ? PRICES_STOCK_DATA[p.c] : (p.stk !== undefined ? p.stk : 0);
+        const name  = p.n || p.c;
+        const idx   = PR_LIST.length;
+        PR_LIST.push([p.c, name, orig, sale, disc, stk]);
+        PR_CODE_MAP[p.c] = idx;
+        const barcodes = Array.isArray(p.barcodes) ? p.barcodes : (p.b ? [p.b] : []);
+        barcodes.forEach(b => { if (b) PR_BARCODE_MAP[b] = idx; });
     });
 }
-
-// فتح نفس قاعدة بيانات الجرد مباشرةً
-function getPricesDB() {
-    return new Promise(resolve => {
-        // أولاً جرّب window.db المحفوظ
-        if (window.db) { resolve(window.db); return; }
-        // إذا لم يكن جاهزاً، افتح DB بنفس اسم الملف
-        const rawPath = (location.href || location.pathname || '').replace(/[^a-zA-Z0-9]/g, '_').slice(-40);
-        const dbName  = 'InvSmartDB_' + (rawPath || 'default');
-        const req = indexedDB.open(dbName);
-        req.onsuccess = e => {
-            const idb = e.target.result;
-            window.db = idb; // احفظها للمرات القادمة
-            resolve(idb);
-        };
-        req.onerror = () => resolve(null);
-    });
-}
+rebuildPricesIndex();
 
 // ── نوع البحث ──
 let priceSearchType = 'barcode';
@@ -3980,88 +4097,60 @@ function setPriceSearchType(t) {
 // تهيئة زر الباركود كنشط عند أول تحميل
 setTimeout(() => setPriceSearchType('barcode'), 100);
 
+let _pricesSearchTimer = null;
 function onPriceSearchInput() {
     const v = document.getElementById('prices-search-input').value.trim();
-    if (priceSearchType === 'name' && v.length >= 2) doPriceSearch();
-    if (priceSearchType === 'code' && v.length >= 3) doPriceSearch();
+    clearTimeout(_pricesSearchTimer);
+    if (priceSearchType === 'name' && v.length >= 2) {
+        _pricesSearchTimer = setTimeout(doPriceSearch, 300);
+    } else if (priceSearchType === 'code' && v.length >= 3) {
+        _pricesSearchTimer = setTimeout(doPriceSearch, 300);
+    }
 }
 
-async function doPriceSearch() {
-    const q    = document.getElementById('prices-search-input').value.trim();
+function doPriceSearch() {
+    const q  = document.getElementById('prices-search-input').value.trim();
     const area = document.getElementById('prices-result-area');
     if (!q) return;
-
-    // تأكد من بناء الفهرس أولاً
-    if (!PR_LIST.length) {
-        area.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">⏳ جاري تحميل البيانات...</div>';
-        await rebuildPricesIndex();
-    }
-
     if (priceSearchType === 'barcode') {
         const idx = PR_BARCODE_MAP[q];
-        area.innerHTML = idx !== undefined
-            ? renderPriceProduct(PR_LIST[idx])
-            : `<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:12px;color:var(--negative);font-size:13px;text-align:center;">❌ لم يُعثر على منتج بهذا الباركود: ${q}</div>`;
+        area.innerHTML = idx !== undefined ? renderPriceProduct(PR_LIST[idx]) : `<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:12px;color:var(--negative);font-size:13px;text-align:center;">❌ لم يُعثر على منتج بهذا الباركود: ${q}</div>`;
     } else if (priceSearchType === 'code') {
-        const ql    = q.toLowerCase();
         const exact = PR_CODE_MAP[q];
         if (exact !== undefined) { area.innerHTML = renderPriceProduct(PR_LIST[exact]); return; }
-        const results = PR_LIST.filter(p => p[0].toLowerCase().includes(ql)).slice(0, 20);
-        area.innerHTML = renderPriceResultList(results, `لا توجد نتائج لرقم الصنف: "${q}"`);
+        const results = PR_LIST.filter(p => p[0].toLowerCase().includes(q.toLowerCase())).slice(0, 20);
+        area.innerHTML = renderPriceResultList(results, `${t("pricesNotFound")}: "${q}"`);
     } else {
-        const ql      = q.toLowerCase();
-        const results = PR_LIST.filter(p => p[1].toLowerCase().includes(ql)).slice(0, 20);
-        area.innerHTML = renderPriceResultList(results, `لا توجد نتائج لـ "${q}"`);
+        const ql = q.toLowerCase();
+        const results = PR_LIST.filter(p => p[1].includes(q) || p[1].toLowerCase().includes(ql)).slice(0, 20);
+        area.innerHTML = renderPriceResultList(results, `${t("pricesNotFound")}: "${q}"`);
     }
 }
 
 function renderPriceResultList(results, emptyMsg) {
     if (!results.length) return `<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:12px;color:var(--negative);font-size:13px;text-align:center;">❌ ${emptyMsg}</div>`;
     if (results.length === 1) return renderPriceProduct(results[0]);
-    const rows = results.map((p, i) => {
-        const hasDisc = p[2] && p[3] && parseFloat(p[2]) !== parseFloat(p[3]);
-        return `<div data-pcode="${escapeHtml(p[0])}" class="pr-result-row"
-            style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s;">
+    return `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-align:center;">🔎 ${results.length} نتيجة</div>` +
+        results.map(p => `<div onclick="document.getElementById('prices-result-area').innerHTML=renderPriceProduct(PR_LIST[PR_CODE_MAP['${p[0].replace(/'/g,"\\'")}']]);this.parentElement.querySelectorAll('[onclick]').forEach(x=>x.remove());"
+            style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s;"
+            onmouseenter="this.style.borderColor='rgba(245,158,11,0.4)'" onmouseleave="this.style.borderColor='var(--border)'">
             <div style="flex:1;min-width:0;">
                 <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);">${escapeHtml(p[1])}</div>
-                <div style="font-size:10px;color:var(--text-muted);">${escapeHtml(p[0])}</div>
+                <div style="font-size:10px;color:var(--text-muted);">${p[0]}</div>
             </div>
             <div style="text-align:left;flex-shrink:0;">
-                <div style="color:#f59e0b;font-size:15px;font-weight:700;">${p[3] || p[2] || '—'}</div>
-                ${hasDisc ? `<div style="color:var(--text-muted);font-size:10px;text-decoration:line-through;">${p[2]}</div>` : ''}
-                ${p[4] ? `<div style="background:rgba(220,38,38,0.1);color:var(--negative);border-radius:5px;font-size:10px;font-weight:700;padding:1px 5px;text-align:center;">${p[4]}%</div>` : ''}
+                <div style="color:#f59e0b;font-size:15px;font-weight:700;">${p[3] || p[2]}</div>
+                ${p[2] && p[3] && p[2] !== p[3] ? `<div style="color:var(--text-muted);font-size:10px;text-decoration:line-through;">${p[2]}</div>` : ''}
             </div>
-        </div>`;
-    }).join('');
-    return `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-align:center;">🔎 ${results.length} نتيجة — انقر لعرض التفاصيل</div>${rows}`;
+        </div>`).join('');
 }
-
-// تفويض الحدث على منطقة النتائج
-document.addEventListener('click', function(e) {
-    const row = e.target.closest('.pr-result-row');
-    if (row) {
-        const code = row.getAttribute('data-pcode');
-        const idx  = PR_CODE_MAP[code];
-        if (idx !== undefined) {
-            const area = document.getElementById('prices-result-area');
-            if (area) area.innerHTML = renderPriceProduct(PR_LIST[idx]);
-        }
-        return;
-    }
-    const editBtn = e.target.closest('.pr-edit-btn');
-    if (editBtn) {
-        editPriceProductFromResult(editBtn.getAttribute('data-edit-code'));
-    }
-});
 
 function renderPriceProduct(p) {
     if (!p) return '';
-    const stock = p[5] !== null && p[5] !== undefined ? Number(p[5]) : null;
+    const stock = (p[5] !== null && p[5] !== undefined) ? Number(p[5]) : 0;
     let stockClass = '#eef4ff', stockColor = '#1a4fa8';
-    if (stock !== null) {
-        if (stock === 0)       { stockClass = 'rgba(220,38,38,0.08)'; stockColor = 'var(--negative)'; }
-        else if (stock <= 5)   { stockClass = 'rgba(245,158,11,0.1)';  stockColor = '#f59e0b'; }
-    }
+    if (stock === 0)       { stockClass = 'rgba(220,38,38,0.08)'; stockColor = 'var(--negative)'; }
+    else if (stock <= 5)   { stockClass = 'rgba(245,158,11,0.1)';  stockColor = '#f59e0b'; }
     const barcodes = Object.entries(PR_BARCODE_MAP).filter(([b,i]) => i === PR_CODE_MAP[p[0]]).map(([b]) => b);
     const barcodeHtml = barcodes.map(b => `<div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:3px;">
         <span style="color:var(--text-muted);font-weight:600;">📦 الباركود</span>
@@ -4077,9 +4166,9 @@ function renderPriceProduct(p) {
             </div>
             ${barcodeHtml}
         </div>
-        <div style="display:grid;grid-template-columns:${stock !== null ? 'repeat(4,1fr)' : 'repeat(3,1fr)'};gap:8px;margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
             <div style="background:var(--surface3);border-radius:10px;padding:9px 6px;text-align:center;">
-                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">السعر الأصلي</div>
+                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">'${t("pricesOrigPrice")}'</div>
                 <div style="font-size:15px;font-weight:700;color:var(--text-muted);text-decoration:line-through;">${p[2]||'—'}</div>
             </div>
             <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:10px;padding:9px 6px;text-align:center;">
@@ -4090,13 +4179,13 @@ function renderPriceProduct(p) {
                 <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">الخصم</div>
                 <div style="font-size:15px;font-weight:700;color:var(--negative);">${p[4]||0}%</div>
             </div>
-            ${stock !== null ? `<div style="background:${stockClass};border:1px solid rgba(26,79,168,0.2);border-radius:10px;padding:9px 6px;text-align:center;">
-                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">الرصيد</div>
-                <div style="font-size:15px;font-weight:700;color:${stockColor};">${stock} <span style="font-size:10px;font-weight:400;">قطعة</span></div>
-            </div>` : ''}
+            <div style="background:${stockClass};border:1px solid rgba(26,79,168,0.2);border-radius:10px;padding:9px 6px;text-align:center;">
+                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;font-weight:600;">'${t("pricesStock")}'</div>
+                <div style="font-size:15px;font-weight:700;color:${stockColor};">${stock} <span style="font-size:10px;font-weight:400;">${t("pricesUnit")}</span></div>
+            </div>
         </div>
         <div style="display:flex;gap:8px;">
-            <button data-edit-code="${escapeHtml(p[0])}" class="pr-edit-btn"
+            <button onclick="editPriceProductFromResult('${p[0].replace(/'/g,"\\'")}')"
                 style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">
                 ✏️ تعديل
             </button>
@@ -4105,8 +4194,19 @@ function renderPriceProduct(p) {
 }
 
 function editPriceProductFromResult(code) {
-    // للتعديل يجب الذهاب لتبويب المنتجات
-    showToast('للتعديل استخدم تبويب المنتجات');
+    const p = PRICES_PRODUCTS[code];
+    if (!p) return;
+    document.getElementById('pf-code').value  = p.c || '';
+    document.getElementById('pf-name').value  = p.n || '';
+    document.getElementById('pf-orig').value  = p.o || '';
+    document.getElementById('pf-sale').value  = p.s || '';
+    document.getElementById('pf-stock').value = p.stk !== undefined ? p.stk : '';
+    const barcodes = Array.isArray(p.barcodes) ? p.barcodes : (p.b ? [p.b] : []);
+    document.getElementById('pf-barcode').value = barcodes[0] || '';
+    calcPriceDiscount();
+    // التمرير للنموذج
+    const card = document.getElementById('pf-code').closest('.card');
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── قائمة المنتجات ──
@@ -4128,9 +4228,9 @@ function renderPricesList(list) {
     }
     if (countEl) countEl.textContent = list.length.toLocaleString('ar');
     container.innerHTML = items.map(p => {
-        const stk = p[5] !== null && p[5] !== undefined ? Number(p[5]) : null;
-        const stkBadge = stk !== null ? `<div style="background:${stk===0?'rgba(220,38,38,0.1)':stk<=5?'rgba(245,158,11,0.1)':'#eef4ff'};color:${stk===0?'var(--negative)':stk<=5?'#f59e0b':'#1a4fa8'};border-radius:5px;font-size:10px;font-weight:700;padding:1px 5px;margin-top:2px;display:inline-block;">📦 ${stk}</div>` : '';
-        return `<div data-pcode="${escapeHtml(p[0])}" class="pr-result-row"
+        const stk = (p[5] !== null && p[5] !== undefined) ? Number(p[5]) : 0;
+        const stkBadge = `<div style="background:${stk===0?'rgba(220,38,38,0.1)':stk<=5?'rgba(245,158,11,0.1)':'#eef4ff'};color:${stk===0?'var(--negative)':stk<=5?'#f59e0b':'#1a4fa8'};border-radius:5px;font-size:10px;font-weight:700;padding:1px 5px;margin-top:2px;display:inline-block;">📦 ${stk}</div>`;
+        return `<div onclick="showPriceDetail('${p[0].replace(/'/g,"\\'")}')"
             style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s;"
             onmouseenter="this.style.background='var(--surface3)'" onmouseleave="this.style.background='var(--surface2)'">
             <div style="flex:1;min-width:0;">
@@ -4158,10 +4258,19 @@ function showPriceDetail(code) {
 function filterPricesList() {
     const q = (document.getElementById('prices-list-search').value || '').toLowerCase().trim();
     pricesListPage = 0;
-    pricesFilteredList = q
-        ? PR_LIST.filter(p => p[1].toLowerCase().includes(q) || p[0].toLowerCase().includes(q) ||
-            Object.entries(PR_BARCODE_MAP).some(([b, i]) => i === PR_CODE_MAP[p[0]] && b.toLowerCase().includes(q)))
-        : PR_LIST.slice();
+    if (!q) {
+        pricesFilteredList = PR_LIST.slice();
+    } else {
+        // بناء خريطة عكسية: index → array of barcodes (مرة واحدة فقط)
+        pricesFilteredList = PR_LIST.filter(p => {
+            if (p[1].toLowerCase().includes(q)) return true;
+            if (p[0].toLowerCase().includes(q)) return true;
+            // باركودات المنتج محفوظة مباشرة في بنية البيانات
+            const prod = PRICES_PRODUCTS[p[0]];
+            if (prod && prod.barcodes && prod.barcodes.some(b => b.toLowerCase().includes(q))) return true;
+            return false;
+        });
+    }
     renderPricesList(pricesFilteredList);
 }
 
@@ -4170,273 +4279,385 @@ function loadMorePrices() {
     renderPricesList(pricesFilteredList.length ? pricesFilteredList : PR_LIST);
 }
 
-async function refreshPricesList() {
-    const container = document.getElementById('prices-product-list');
-    const countEl   = document.getElementById('prices-list-count');
-    if (container) container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">⏳ جاري التحميل...</div>';
-    await rebuildPricesIndex();
+function refreshPricesList() {
+    // rebuildPricesIndex() يُستدعى فقط عند تغيير البيانات وليس عند كل عرض
     pricesFilteredList = PR_LIST.slice();
     pricesListPage = 0;
     renderPricesList(pricesFilteredList);
 }
 
-// تحديث القائمة عند الانتقال لتبويب الأسعار
+// يُستدعى عند تغيير البيانات فعلاً
+function refreshPricesData() {
+    rebuildPricesIndex();
+    refreshPricesList();
+}
+
+// مزامنة تلقائية عند فتح تبويب الأسعار
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', function() {
         if (this.getAttribute('data-tab') === 'tab-prices') {
-            setTimeout(() => refreshPricesList(), 50);
+            setTimeout(() => syncPricesFromDB(false), 50);
         }
     });
 });
 
-// ══════════════════════════════════════════════
-//  سكانر تبويب الأسعار — BarcodeDetector + ZXing
-// ══════════════════════════════════════════════
-let _psScanning    = false;
-let _psCameras     = [];
-let _psSelectedCam = null;
-let _psStream      = null;
-let _psAnimFrame   = null;
-let _psDetector    = null;
-let _psCooldown    = false;
-let _psZxingReader = null;
+// ── رفع ملف الأسعار ──
 
-// تحميل قائمة الكاميرات
-async function psLoadCameraList() {
-    const sel = document.getElementById('ps-cam-select');
-    sel.innerHTML = '<option value="">⏳ جاري التحميل...</option>';
+
+
+
+
+let _pendingPricesStockFile = null;
+let _pendingPricesStockRows = null;
+
+// prices stock upload removed
+
+
+async function processPricesStockFile() {
+    if (!_pendingPricesStockFile) return;
+    const status = document.getElementById('prices-stock-status');
+    status.textContent = '⏳ جاري قراءة الملف...';
     try {
-        await navigator.mediaDevices.getUserMedia({ video: true })
-            .then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        _psCameras = devices
-            .filter(d => d.kind === 'videoinput')
-            .map((d, i) => ({ id: d.deviceId, label: d.label || 'كاميرا ' + (i + 1) }));
-        if (!_psCameras.length) {
-            sel.innerHTML = '<option value="">❌ لا توجد كاميرات</option>';
+        const { data, type } = await readFileRobust(_pendingPricesStockFile);
+        const wb   = parseWorkbook(data, type);
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+        if (!rows.length) { status.textContent = '❌ الملف فارغ'; return; }
+        _pendingPricesStockRows = rows;
+
+        const firstRow = rows[0].map(h => String(h).trim());
+        const maxCols  = Math.min(firstRow.length, 26);
+
+        // معاينة
+        let previewHtml = `<table style="border-collapse:collapse;font-size:11px;width:100%;min-width:200px;">
+            <tr>${firstRow.slice(0,maxCols).map(h => `<th style="background:rgba(59,130,246,0.1);color:#1d4ed8;padding:4px 8px;text-align:center;border:1px solid rgba(59,130,246,0.2);white-space:nowrap;">${escapeHtml(h)||'—'}</th>`).join('')}</tr>`;
+        for (let r = 1; r < Math.min(rows.length, 3); r++) {
+            previewHtml += `<tr>${rows[r].slice(0,maxCols).map(c => `<td style="padding:3px 8px;border:1px solid var(--border);color:var(--text-muted);text-align:center;">${escapeHtml(String(c).trim()).slice(0,15)||'—'}</td>`).join('')}</tr>`;
+        }
+        previewHtml += '</table>';
+        document.getElementById('prices-stk-preview').innerHTML = previewHtml;
+
+        function buildStkOpts(selId, autoIdx) {
+            const sel = document.getElementById(selId);
+            sel.innerHTML = `<option value="">— غير محدد —</option>`;
+            firstRow.forEach((h,i) => { const o=document.createElement('option'); o.value=i; o.textContent=`عمود ${i+1}: ${h||'(فارغ)'}`; if(i===autoIdx) o.selected=true; sel.appendChild(o); });
+        }
+        function detect(kws, fallback) {
+            const idx = firstRow.findIndex(h => kws.some(k => h.includes(k)));
+            return idx >= 0 ? idx : fallback;
+        }
+        buildStkOpts('ps-smap-code', detect(['رقم الصنف','رقم صنف','كود','sku','item'], 0));
+        buildStkOpts('ps-smap-name', detect(['اسم الصنف','اسم المنتج','اسم','name'], -1));
+        buildStkOpts('ps-smap-qty',  detect(['فعلي نهائي','الفعلي النهائي','رصيد','كمية','stock','qty','quantity','مخزون'], 1));
+
+        document.getElementById('prices-stk-error').style.display = 'none';
+        document.getElementById('prices-stk-map-modal').style.display = 'flex';
+        status.textContent = '';
+        document.getElementById('prices-stock-file').value = '';
+    } catch(e) {
+        status.innerHTML = `<span style="color:var(--negative);">❌ خطأ: ${e.message}</span>`;
+    }
+}
+
+function closePricesStkMap() {
+    document.getElementById('prices-stk-map-modal').style.display = 'none';
+    _pendingPricesStockRows = null;
+    _pendingPricesStockFile = null;
+    document.getElementById('prices-stock-process-btn').style.display = 'none';
+    document.getElementById('prices-stock-upload-text').textContent = 'انقر لاختيار ملف الرصيد';
+}
+
+function confirmPricesStkMap() {
+    const rows = _pendingPricesStockRows;
+    if (!rows) return;
+    const errEl   = document.getElementById('prices-stk-error');
+    const colCode = parseInt(document.getElementById('ps-smap-code').value);
+    const colName = parseInt(document.getElementById('ps-smap-name').value);
+    const colQty  = parseInt(document.getElementById('ps-smap-qty').value);
+    if (isNaN(colCode) || isNaN(colQty)) { errEl.textContent='⚠️ يرجى اختيار أعمدة رقم الصنف والكمية'; errEl.style.display='block'; return; }
+    errEl.style.display = 'none';
+
+    const startRow = isNaN(Number(rows[0][colQty])) ? 1 : 0;
+    let updated = 0, added = 0;
+
+    rows.forEach((row, ri) => {
+        if (ri < startRow) return;
+        const code = String(row[colCode]||'').trim().replace(/\.0+$/,'');
+        if (!code) return;
+        const qty = Number(row[colQty]);
+        if (isNaN(qty)) return;
+        PRICES_STOCK_DATA[code] = qty;
+        if (PRICES_PRODUCTS[code]) {
+            PRICES_PRODUCTS[code].stk = qty;
+            updated++;
+        } else {
+            // أضف منتج جديد من الرصيد فقط
+            const name = (!isNaN(colName) && row[colName]) ? String(row[colName]).trim() : code;
+            PRICES_PRODUCTS[code] = { c: code, n: name, o: 0, s: 0, d: 0, barcodes: [], stk: qty };
+            added++;
+        }
+    });
+
+
+
+    closePricesStkMap();
+    rebuildPricesIndex();
+    refreshPricesList();
+    document.getElementById('prices-stock-status').innerHTML =
+        `<span style="color:var(--accent);">✅ تم تحديث رصيد ${updated.toLocaleString('ar')} منتج</span>` +
+        (added ? ` — <span style="color:#1a4fa8;">➕ ${added.toLocaleString('ar')} منتج جديد من الرصيد</span>` : '');
+}
+
+// ── نموذج الإضافة اليدوية ──
+function calcPriceDiscount() {
+    const orig = parseFloat(document.getElementById('pf-orig').value) || 0;
+    const sale = parseFloat(document.getElementById('pf-sale').value) || 0;
+    const preview = document.getElementById('pf-discount-preview');
+    if (orig > 0 && sale > 0 && sale < orig) {
+        const disc = Math.round((orig - sale) / orig * 100);
+        document.getElementById('pf-disc-val').textContent = disc + '%';
+        preview.style.display = 'block';
+    } else { preview.style.display = 'none'; }
+}
+
+function savePriceProduct() {
+    const code    = document.getElementById('pf-code').value.trim();
+    const name    = document.getElementById('pf-name').value.trim();
+    const barcode = document.getElementById('pf-barcode').value.trim();
+    const orig    = parseFloat(document.getElementById('pf-orig').value) || 0;
+    const sale    = parseFloat(document.getElementById('pf-sale').value) || orig;
+    const stk     = document.getElementById('pf-stock').value !== '' ? parseInt(document.getElementById('pf-stock').value) : undefined;
+    if (!code || !name) { showToast('⚠️ رقم الصنف والاسم مطلوبان', true); return; }
+    const disc    = orig > 0 ? Math.round((orig - sale) / orig * 100) : 0;
+    const existing = PRICES_PRODUCTS[code] || {};
+    const barcodes = existing.barcodes || [];
+    if (barcode && !barcodes.includes(barcode)) barcodes.push(barcode);
+    PRICES_PRODUCTS[code] = { c: code, n: name, o: orig, s: sale, d: disc, barcodes, stk };
+    if (stk !== undefined) PRICES_STOCK_DATA[code] = stk;
+
+
+    rebuildPricesIndex();
+    refreshPricesList();
+    const successEl = document.getElementById('pf-success');
+    successEl.style.display = 'block';
+    setTimeout(() => { successEl.style.display = 'none'; }, 2500);
+}
+
+function clearPriceForm() {
+    ['pf-code','pf-name','pf-barcode','pf-orig','pf-sale','pf-stock'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    document.getElementById('pf-discount-preview').style.display = 'none';
+}
+
+// ── تصدير الأسعار ──
+async function exportPricesData() {
+    if (!PR_LIST.length) { showToast('لا توجد بيانات للتصدير', true); return; }
+    showToast('⏳ جاري التصدير...');
+    try {
+        const ExcelJS = window.ExcelJS;
+        if (!ExcelJS) { showToast('❌ مكتبة التصدير غير متاحة', true); return; }
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('الأسعار والأرصدة', { views:[{rightToLeft:true}] });
+        ws.columns = [
+            { header:'رقم الصنف', key:'code', width:22 },
+            { header:'الاسم',     key:'name', width:32 },
+            { header:'الباركود',  key:'barcode', width:18 },
+            { header:'السعر الأصلي', key:'orig', width:14 },
+            { header:'سعر الخصم',    key:'sale', width:14 },
+            { header:'% الخصم',      key:'disc', width:12 },
+            { header:'الرصيد',        key:'stk',  width:12 },
+        ];
+        const hdr = ws.getRow(1);
+        hdr.height = 22;
+        hdr.eachCell(cell => {
+            cell.fill      = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFb45309' } };
+            cell.font      = { color:{ argb:'FFFFFFFF' }, bold:true, size:11 };
+            cell.alignment = { horizontal:'center', vertical:'middle', readingOrder:'rtl' };
+        });
+        PR_LIST.forEach((p, ri) => {
+            const barcodes = Object.entries(PR_BARCODE_MAP).filter(([b,i]) => i === ri).map(([b]) => b);
+            const row = ws.addRow({
+                code: p[0], name: p[1], barcode: barcodes.join(', '),
+                orig: p[2]||'', sale: p[3]||'', disc: p[4]||0,
+                stk: (p[5] !== null && p[5] !== undefined) ? p[5] : 0,
+            });
+            row.height = 18;
+            row.eachCell(cell => { cell.alignment = { horizontal:'center', readingOrder:'rtl' }; });
+        });
+        ws.views = [{ state:'frozen', ySplit:1, rightToLeft:true }];
+        const buf = await wb.xlsx.writeBuffer();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+        a.download = 'الأسعار_والأرصدة_' + new Date().toLocaleDateString('ar-SA').replace(/\//g,'-') + '.xlsx';
+        a.click();
+        showToast('✅ تم التصدير بنجاح');
+    } catch(e) { showToast('❌ خطأ في التصدير: ' + e.message, true); }
+}
+
+// ══════════════════════════════════════════════════
+//  سكانر الأسعار — @zxing/browser (ZXingBrowser)
+// ══════════════════════════════════════════════════
+var _pzxControls  = null;
+var _pricesCamActive = false;
+var _pricesCamList   = [];
+var _pricesCurCam    = null;
+var _pricesScanLock  = false;
+var _pricesLastScan  = 0;
+var PRICES_SCAN_DELAY = 1800;
+
+function _pricesSetStatus(msg) {
+    var el = document.getElementById('prices-scan-status');
+    if (el) el.textContent = msg;
+}
+
+async function _pricesStop() {
+    if (_pzxControls) { try { _pzxControls.stop(); } catch(e){} _pzxControls = null; }
+    var vid = document.getElementById('prices-reader');
+    if (vid && vid.srcObject) { vid.srcObject.getTracks().forEach(function(t){ t.stop(); }); vid.srcObject = null; }
+    _pricesCamActive = false;
+}
+
+async function _pricesLoadCameras() {
+    try {
+        var devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+        _pricesCamList = devices.map(function(d){ return { id: d.deviceId, label: d.label }; });
+        var sel = document.getElementById('prices-cam-select');
+        if (!sel || !_pricesCamList.length) return;
+        sel.innerHTML = '';
+        _pricesCamList.forEach(function(d, i) {
+            var o = document.createElement('option');
+            o.value = d.id;
+            o.textContent = d.label || ('كاميرا ' + (i + 1));
+            sel.appendChild(o);
+        });
+        var back = _pricesCamList.find(function(d){ return /back|rear|environment/i.test(d.label || ''); })
+                   || _pricesCamList[_pricesCamList.length - 1];
+        _pricesCurCam = back.id;
+        sel.value = _pricesCurCam;
+        sel.onchange = function(){ _pricesCurCam = this.value; };
+    } catch(e) { console.warn('prices listCameras:', e); }
+}
+
+async function _pricesStartCam(camId) {
+    await _pricesStop();
+    var targetId = camId || _pricesCurCam || undefined;
+    var vid = document.getElementById('prices-reader');
+    if (!vid) { _pricesSetStatus('❌ خطأ في التهيئة'); return; }
+    try {
+        var codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+        _pzxControls = await codeReader.decodeFromVideoDevice(targetId, vid, function(result, err) {
+            if (!result) return;
+            var now = Date.now();
+            if (_pricesScanLock || now - _pricesLastScan < PRICES_SCAN_DELAY) return;
+            _pricesScanLock = true;
+            _pricesLastScan = now;
+            var code = String(result.getText() || '').trim().replace(/\.0+$/, '');
+            if (!code) { _pricesScanLock = false; return; }
+            var inp = document.getElementById('prices-search-input');
+            if (inp) inp.value = code;
+            var isNum = /^\d+$/.test(code);
+            if (isNum && priceSearchType !== 'barcode') setPriceSearchType('barcode');
+            else if (!isNum && priceSearchType === 'barcode') setPriceSearchType('code');
+            doPriceSearch();
+            _pricesSetStatus('✅ تم مسح: ' + code);
+            if (navigator.vibrate) navigator.vibrate(60);
+            setTimeout(function(){
+                _pricesScanLock = false;
+                if (_pricesCamActive) _pricesSetStatus('🎯 ' + t('pricesCamStatus'));
+            }, PRICES_SCAN_DELAY);
+        });
+        _pricesCamActive = true;
+        _pricesSetStatus('🎯 ' + t('pricesCamStatus'));
+    } catch(err) {
+        _pricesCamActive = false;
+        _pricesSetStatus('❌ ' + (err.message || err));
+        console.error('prices cam:', err);
+    }
+}
+
+async function togglePricesCamera() {
+    if (_pricesCamActive) { await closePricesCamera(); return; }
+    var area = document.getElementById('prices-camera-area');
+    if (area) area.style.display = 'block';
+    var btn = document.getElementById('prices-cam-btn');
+    if (btn) { btn.style.background = 'linear-gradient(135deg,#dc2626,#ef4444)'; btn.innerHTML = '<i class="fas fa-times"></i>'; }
+    _pricesSetStatus(t('pricesCamLoading'));
+    if (!_pricesCamList.length) await _pricesLoadCameras();
+    await _pricesStartCam(_pricesCurCam || undefined);
+}
+
+async function closePricesCamera() {
+    await _pricesStop();
+    var area = document.getElementById('prices-camera-area');
+    if (area) area.style.display = 'none';
+    var btn = document.getElementById('prices-cam-btn');
+    if (btn) { btn.style.background = 'linear-gradient(135deg,#1d4ed8,#3b82f6)'; btn.innerHTML = '<i class="fas fa-camera"></i>'; }
+    _pricesScanLock = false;
+}
+
+async function switchPricesCamera() {
+    if (!_pricesCamList.length) await _pricesLoadCameras();
+    if (_pricesCamList.length < 2) return;
+    var idx  = _pricesCamList.findIndex(function(c){ return c.id === _pricesCurCam; });
+    var next = _pricesCamList[(idx + 1) % _pricesCamList.length];
+    _pricesCurCam = next.id;
+    var sel = document.getElementById('prices-cam-select');
+    if (sel) sel.value = _pricesCurCam;
+    await _pricesStartCam(_pricesCurCam);
+}
+// ── مزامنة الأسعار من قاعدة بيانات المنتجات والمرجع ──
+// ── مزامنة من IndexedDB (المصدر الوحيد للبيانات) ──
+async function syncPricesFromDB(silent = false) {
+    const statusEl = document.getElementById('prices-sync-status');
+    if (!silent && statusEl) statusEl.innerHTML = '<span style="color:var(--text-muted);">⏳ جاري القراءة...</span>';
+    try {
+        if (typeof db === 'undefined' || !db) {
+            if (!silent && statusEl) statusEl.innerHTML = '<span style="color:var(--negative);">❌ قاعدة البيانات غير جاهزة</span>';
             return;
         }
-        sel.innerHTML = '';
-        _psCameras.forEach(cam => {
-            const opt = document.createElement('option');
-            opt.value = cam.id;
-            opt.textContent = cam.label;
-            sel.appendChild(opt);
+        // جلب المنتجات والمرجع من IndexedDB
+        const [prods, stockItems] = await Promise.all([
+            new Promise(r => { const tx = db.transaction("products","readonly"); tx.objectStore("products").getAll().onsuccess = e => r(e.target.result); }),
+            new Promise(r => { const tx = db.transaction("stock","readonly");    tx.objectStore("stock").getAll().onsuccess    = e => r(e.target.result); })
+        ]);
+
+        // بناء خريطة الرصيد
+        const stockMap = {};
+        stockItems.forEach(s => { stockMap[s.key] = s.qty; });
+
+        // إعادة بناء PRICES_PRODUCTS من الصفر
+        PRICES_PRODUCTS   = {};
+        PRICES_STOCK_DATA = stockMap;
+
+        prods.forEach(p => {
+            const code = p.item_no || p.barcode;
+            if (!code) return;
+            const orig = parseFloat(p.orig_price) || 0;
+            const sale = parseFloat(p.sale_price) || orig;
+            const disc = orig > 0 ? Math.round((orig - sale) / orig * 100) : 0;
+            const stk  = stockMap[code] !== undefined ? stockMap[code] : 0;
+            const barcodes = (p.barcode && p.barcode !== code) ? [p.barcode] : [];
+            if (PRICES_PRODUCTS[code]) {
+                if (p.barcode && !PRICES_PRODUCTS[code].barcodes.includes(p.barcode))
+                    PRICES_PRODUCTS[code].barcodes.push(p.barcode);
+            } else {
+                PRICES_PRODUCTS[code] = { c: code, n: p.name || code, o: orig, s: sale, d: disc, barcodes, stk };
+            }
         });
-        // اختيار الكاميرا الخلفية تلقائياً (camera 3 أو back/rear)
-        const preferred = _psCameras.find(c => /camera\s*3/i.test(c.label))
-            || _psCameras.find(c => /\b3\b.*back|back.*\b3\b/i.test(c.label))
-            || _psCameras[3]
-            || _psCameras.find(c => /back|rear/i.test(c.label))
-            || _psCameras[_psCameras.length - 1];
-        sel.value = preferred.id;
-        _psSelectedCam = preferred.id;
-    } catch (e) {
-        sel.innerHTML = '<option value="">⚠️ تعذّر الوصول للكاميرات</option>';
-    }
-}
 
-function psOnCamChange() {
-    _psSelectedCam = document.getElementById('ps-cam-select').value;
-    if (_psScanning) { psStopScanner(); setTimeout(() => psStartScanner(), 400); }
-}
-
-async function psToggleScanner() {
-    if (_psScanning) { psStopScanner(); return; }
-    const btn = document.getElementById('ps-toggle-btn');
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التشغيل...';
-    btn.disabled = true;
-    if (!_psCameras.length) await psLoadCameraList();
-    psStartScanner();
-}
-
-async function psStartScanner() {
-    await psStopScanner();
-
-    const video = document.getElementById('ps-scanner-video');
-    const wrap  = document.getElementById('ps-scanner-wrap');
-    const line  = document.getElementById('ps-scan-line');
-    wrap.style.display = 'block';
-    video.style.display = 'block';
-    if (line) line.style.display = 'block';
-
-    const camId = _psSelectedCam || (_psCameras.length ? _psCameras[_psCameras.length - 1].id : null);
-    const constraints = camId
-        ? { video: { deviceId: { exact: camId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
-        : { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
-
-    try {
-        _psStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = _psStream;
-        await video.play();
-    } catch (e) {
-        psStopScanner();
-        return;
-    }
-
-    // BarcodeDetector API
-    if ('BarcodeDetector' in window) {
-        _psDetector = new BarcodeDetector({
-            formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code','data_matrix']
-        });
-    } else {
-        _psDetector = null;
-    }
-
-    _psScanning = true;
-    _psCooldown = false;
-    const btn = document.getElementById('ps-toggle-btn');
-    btn.innerHTML = '<i class="fas fa-stop-circle"></i> إغلاق الكاميرا';
-    btn.style.background = 'linear-gradient(135deg,#991b1b,#ef4444)';
-    btn.disabled = false;
-
-    // حلقة المسح بـ BarcodeDetector
-    async function psScanLoop() {
-        if (!_psScanning) return;
-        if (_psDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
-            try {
-                const barcodes = await _psDetector.detect(video);
-                if (barcodes.length > 0 && !_psCooldown) {
-                    _psCooldown = true;
-                    psOnBarcodeFound(barcodes[0].rawValue);
-                    setTimeout(() => { _psCooldown = false; }, 1500);
-                }
-            } catch (e) {}
+        rebuildPricesIndex();
+        refreshPricesList();
+        if (statusEl) {
+            statusEl.innerHTML = `<span style="color:var(--accent);">✅ ${prods.length.toLocaleString('ar')} منتج · رصيد ${stockItems.length.toLocaleString('ar')} صنف</span>`;
+            setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 3000);
         }
-        _psAnimFrame = requestAnimationFrame(psScanLoop);
-    }
-
-    if (!_psDetector) {
-        psStartZxingLoop(video); // fallback
-    } else {
-        _psAnimFrame = requestAnimationFrame(psScanLoop);
+    } catch(e) {
+        if (!silent && statusEl) statusEl.innerHTML = `<span style="color:var(--negative);">❌ خطأ: ${e.message}</span>`;
+        console.error('syncPricesFromDB:', e);
     }
 }
-
-async function psStopScanner() {
-    _psScanning = false;
-    _psCooldown = false;
-    if (_psAnimFrame) { cancelAnimationFrame(_psAnimFrame); _psAnimFrame = null; }
-    if (_psStream)    { _psStream.getTracks().forEach(t => t.stop()); _psStream = null; }
-    const video = document.getElementById('ps-scanner-video');
-    const wrap  = document.getElementById('ps-scanner-wrap');
-    const line  = document.getElementById('ps-scan-line');
-    if (video) { video.srcObject = null; }
-    if (wrap)  { wrap.style.display = 'none'; }
-    if (line)  { line.style.display = 'none'; }
-    const btn = document.getElementById('ps-toggle-btn');
-    if (btn) {
-        btn.innerHTML = '<i class="fas fa-camera"></i> تشغيل السكانر';
-        btn.style.background = 'linear-gradient(135deg,#b45309,#f59e0b)';
-        btn.disabled = false;
-    }
-}
-
-// ZXing fallback
-function psStartZxingLoop(video) {
-    if (!window.ZXing) return;
-    const hints = new Map();
-    const formats = [
-        ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
-        ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-        ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-        ZXing.BarcodeFormat.QR_CODE
-    ];
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-    _psZxingReader = new ZXing.MultiFormatReader();
-    _psZxingReader.setHints(hints);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    function zLoop() {
-        if (!_psScanning) return;
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.width  = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            try {
-                const imgData  = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
-                const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-                const result    = _psZxingReader.decode(bitmap);
-                if (result && !_psCooldown) {
-                    _psCooldown = true;
-                    psOnBarcodeFound(result.getText());
-                    setTimeout(() => { _psCooldown = false; }, 1500);
-                }
-            } catch (e) {}
-        }
-        _psAnimFrame = requestAnimationFrame(zLoop);
-    }
-    _psAnimFrame = requestAnimationFrame(zLoop);
-}
-
-// عند قراءة الباركود
-function psOnBarcodeFound(code) {
-    // صوت
-    try {
-        const ac  = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ac.createOscillator();
-        const gain = ac.createGain();
-        osc.connect(gain); gain.connect(ac.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1800, ac.currentTime);
-        gain.gain.setValueAtTime(0.6, ac.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.18);
-        osc.start(ac.currentTime); osc.stop(ac.currentTime + 0.18);
-        setTimeout(() => ac.close(), 300);
-    } catch (e) {}
-
-    // اهتزاز
-    if (navigator.vibrate) navigator.vibrate([40, 20, 60]);
-
-    // وميض ذهبي
-    const wrap  = document.getElementById('ps-scanner-wrap');
-    const flash = document.getElementById('ps-scan-flash');
-    if (wrap && flash) {
-        flash.style.animation = 'none';
-        flash.style.display   = 'block';
-        flash.style.background = 'rgba(245,158,11,0.45)';
-        void flash.offsetWidth; // reflow
-        flash.style.animation = 'psScanFlash .45s ease-out forwards';
-        setTimeout(() => { flash.style.display = 'none'; flash.style.background = ''; }, 500);
-    }
-
-    // ضع الكود في حقل البحث وابحث
-    const input = document.getElementById('prices-search-input');
-    if (input) input.value = code;
-    setPriceSearchType('barcode');
-    doPriceSearch();
-
-    // أغلق الكاميرا إذا وُجد تطابق
-    const matched = PR_BARCODE_MAP[code] !== undefined;
-    if (matched) { setTimeout(() => psStopScanner(), 600); }
-}
-
-function psClearSearch() {
-    const input = document.getElementById('prices-search-input');
-    if (input) input.value = '';
-    document.getElementById('prices-result-area').innerHTML = '';
-}
-
-// إيقاف السكانر عند مغادرة تبويب الأسعار
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        if (this.getAttribute('data-tab') !== 'tab-prices' && _psScanning) {
-            psStopScanner();
-        }
-    });
-});
-
-// تحميل الكاميرات عند فتح تبويب الأسعار لأول مرة
-let _psCamerasLoaded = false;
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        if (this.getAttribute('data-tab') === 'tab-prices' && !_psCamerasLoaded) {
-            _psCamerasLoaded = true;
-            psLoadCameraList();
-        }
-    });
-});
 </script>
 </body>
 </html>
