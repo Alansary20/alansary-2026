@@ -1598,7 +1598,7 @@
           <input type="checkbox" id="colMapNoHeader" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;">
         </label>
       </div>
-      <div id="colMapPreview" style="display:flex;flex-wrap:wrap;gap:6px;padding:12px;background:var(--surface2);border-radius:12px;border:none;max-height:100px;overflow-y:auto;"></div>
+      <div id="colMapPreview" style="display:flex;flex-wrap:wrap;gap:6px;padding:12px;background:var(--surface2);border-radius:12px;border:none;max-height:180px;overflow-y:auto;"></div>
     </div>
     <div id="colMapFields" style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;"></div>
     <div style="display:flex;gap:12px;">
@@ -1609,12 +1609,17 @@
 </div>
 
 <div id="productModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px); justify-content:center; align-items:center; z-index:3000;">
-    <div style="background:#13161e; border-radius:20px; padding:24px; width:90%; max-width:380px; border:1px solid rgba(16,185,129,0.2); box-shadow:0 20px 60px rgba(0,0,0,0.6);">
-        <h3 style="color:#06b6d4; margin-bottom:16px; font-family:'Tajawal',sans-serif;">➕ <span data-i18n="addProduct">إضافة منتج</span></h3>
-        <input type="text" id="modalItemNo" data-i18n-placeholder="modalItemNo" placeholder="رقم الصنف *" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;">
-        <input type="text" id="modalName" data-i18n-placeholder="modalName" placeholder="الاسم *" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;">
-        <input type="text" id="modalBarcode" data-i18n-placeholder="modalBarcode" placeholder="الباركود (اختياري)" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;">
-        <input type="number" id="modalQty" data-i18n-placeholder="modalQty" placeholder="كمية مرجعية" value="0" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;">
+    <div style="background:#13161e; border-radius:20px; padding:24px; width:90%; max-width:400px; border:1px solid rgba(16,185,129,0.2); box-shadow:0 20px 60px rgba(0,0,0,0.6); max-height:90vh; overflow-y:auto;">
+        <h3 id="productModalTitle" style="color:#06b6d4; margin-bottom:16px; font-family:'Tajawal',sans-serif;">➕ <span data-i18n="addProduct">إضافة منتج</span></h3>
+        <input type="hidden" id="modalEditId" value="">
+        <input type="text" id="modalItemNo" data-i18n-placeholder="modalItemNo" placeholder="رقم الصنف *" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;box-sizing:border-box;">
+        <input type="text" id="modalName" data-i18n-placeholder="modalName" placeholder="الاسم *" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;box-sizing:border-box;">
+        <input type="text" id="modalBarcode" data-i18n-placeholder="modalBarcode" placeholder="الباركود (اختياري)" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;box-sizing:border-box;">
+        <input type="number" id="modalQty" data-i18n-placeholder="modalQty" placeholder="كمية مرجعية" value="0" style="display:block;width:100%;padding:11px 14px;margin-bottom:10px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;box-sizing:border-box;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <input type="number" id="modalPriceOrig" placeholder="السعر الأساسي" style="padding:11px 14px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;width:100%;box-sizing:border-box;">
+            <input type="number" id="modalPriceSale" placeholder="السعر بعد الخصم" style="padding:11px 14px;background:#1a1e2a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;color:#e8edf5;font-family:'Cairo',sans-serif;width:100%;box-sizing:border-box;">
+        </div>
         <div style="display:flex; gap:12px; margin-top:12px;">
             <button id="saveProductBtn" style="background:linear-gradient(135deg,#0891b2,#06b6d4); color:#fff; border:none; padding:12px; border-radius:10px; flex:1; font-weight:800; font-family:'Cairo',sans-serif; cursor:pointer;" data-i18n="save">حفظ</button>
             <button id="closeModalBtn" style="background:var(--surface2); color:var(--text); border:none; padding:12px; border-radius:10px; flex:1; cursor:pointer; font-family:'Cairo',sans-serif;" data-i18n="cancel">إلغاء</button>
@@ -1956,8 +1961,8 @@
                 { id: 'barcode', label: t('thBarcode'),  icon: 'fas fa-barcode',     color: 'var(--accent2)',    required: false, keywords: ['باركود','barcode','بار','كود'] },
                 { id: 'itemno',  label: t('thItemNo'),   icon: 'fas fa-hashtag',     color: 'var(--accent)',     required: false, keywords: ['رقم الصنف','رقم','item','صنف'] },
                 { id: 'name',    label: t('thName'),     icon: 'fas fa-tag',         color: 'var(--text-muted)', required: false, keywords: ['اسم','name','وصف','desc','المادة'] },
-                { id: 'price_orig', label: 'السعر الأصلي', icon: 'fas fa-money-bill', color: '#9ca3af', required: false, keywords: ['أصلي','original','سعر قبل','سعر أصلي','سعر1'] },
-                { id: 'price_sale', label: 'سعر الخصم',   icon: 'fas fa-tags',       color: '#f59e0b', required: false, keywords: ['خصم','sale','بعد','صافي','net','سعر بعد','سعر2'] },
+                { id: 'price_orig', label: 'السعر الأساسي', icon: 'fas fa-money-bill', color: '#9ca3af', required: false, keywords: ['أصلي','original','سعر قبل','سعر أصلي','سعر1'] },
+                { id: 'price_sale', label: 'السعر بعد الخصم',   icon: 'fas fa-tags',       color: '#f59e0b', required: false, keywords: ['خصم','sale','بعد','صافي','net','سعر بعد','سعر2'] },
             ],
             async function(colMap) {
                 if (colMap.barcode === null && colMap.itemno === null) { showToast(t('selectBarcodeOrItem'), true); return; }
@@ -2030,9 +2035,22 @@
                         label: noHeader ? (t('colPrefix') + (i+1)) : (String(h||'').trim() || (t('colPrefix') + (i+1))),
                         idx: i
                     }));
-                    document.getElementById('colMapPreview').innerHTML = hdrs.map(h =>
-                        '<span style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:6px;padding:2px 8px;font-size:0.68rem;color:var(--accent);white-space:nowrap;">' + h.label + '</span>'
-                    ).join('');
+                    // أول 3 صفوف بيانات (بعد الهيدر إن وُجد)
+                    const dataStart = noHeader ? 0 : 1;
+                    const previewRows = rawRows.slice(dataStart, dataStart + 3);
+
+                    document.getElementById('colMapPreview').innerHTML = hdrs.map(h => {
+                        const samples = previewRows
+                            .map(r => String(r[h.idx]||'').trim())
+                            .filter(v => v)
+                            .slice(0, 3)
+                            .map(v => `<div style="font-size:0.62rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">${v}</div>`)
+                            .join('');
+                        return `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:5px 8px;font-size:0.68rem;color:var(--accent);white-space:nowrap;min-width:70px;max-width:110px;cursor:default;">
+                            <div style="font-weight:700;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.label}</div>
+                            ${samples || '<div style="font-size:0.6rem;color:var(--text-dim);">—</div>'}
+                        </div>`;
+                    }).join('');
                     const fieldsDiv = document.getElementById('colMapFields');
                     fieldsDiv.innerHTML = '';
                     fields.forEach(function(f) {
@@ -2612,21 +2630,29 @@
         else if (tabId === 'tab-inv') {
             await _ensureCache('inv');
             inventory = (_cache.inv || []).sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
-            const hdr = `<div style="display:grid;grid-template-columns:1fr auto auto;gap:0;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.75rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;">
-                <span>${t('thItemNo')} · ${t('thName')}</span>
+            const hdr = `<div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:0;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.72rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;">
+                <span>${t('thItemNo')}</span>
+                <span>${t('thBarcode')}</span>
                 <span style="min-width:44px;text-align:center;">${t('thQty')}</span>
-                <span style="min-width:64px;text-align:center;padding-right:4px;">${t('thLastScan')}</span>
+                <span style="min-width:56px;text-align:center;padding-right:4px;">${t('thLastScan')}</span>
             </div>`;
             const vl = _getOrCreateVL('inventoryFullTable', {
-                rowHeight: 52,
-                renderRow: (i) => `<div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);gap:8px;min-height:52px;">
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-size:0.76rem;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(i.item_no||i.barcode||'')}</div>
-                        <div style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(i.name)}</div>
-                    </div>
-                    <div style="flex-shrink:0;min-width:44px;text-align:center;font-size:0.9rem;font-weight:800;color:var(--accent);">${i.qty}</div>
-                    <div style="flex-shrink:0;min-width:64px;text-align:center;font-size:0.66rem;color:var(--text-dim);">${i.timestamp?new Date(i.timestamp).toLocaleTimeString('ar-SA'):'-'}</div>
-                </div>`
+                rowHeight: 58,
+                renderRow: (i) => {
+                    const itemNo  = i.item_no  && i.item_no  !== i.key ? i.item_no  : (i.key && i.key.includes('-') ? i.key : '');
+                    const barcode = i.barcode  && i.barcode  !== i.key ? i.barcode  : (i.key && /^\d+$/.test(i.key) ? i.key : '');
+                    return `<div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);gap:8px;min-height:58px;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:0.75rem;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(itemNo||'—')}</div>
+                            <div style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${escapeHtml(i.name)}</div>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:0.72rem;color:var(--neutral);font-family:'Courier New',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(barcode||'—')}</div>
+                        </div>
+                        <div style="flex-shrink:0;min-width:44px;text-align:center;font-size:0.9rem;font-weight:800;color:var(--accent);">${i.qty}</div>
+                        <div style="flex-shrink:0;min-width:56px;text-align:center;font-size:0.66rem;color:var(--text-dim);">${i.timestamp?new Date(i.timestamp).toLocaleTimeString('ar-SA'):'-'}</div>
+                    </div>`;
+                }
             }, hdr);
             vl.setItems(inventory);
         }
@@ -2676,7 +2702,12 @@
                     const i = invMap.get(k), s = stockMap.get(k);
                     const qi = i ? i.qty : 0, qs = s ? s.qty : 0, diff = qi - qs;
                     const fp = prodsMap.get(k);
-                    rows.push({ itemNo: (i||s)?.item_no || fp?.item_no || k, barcode: i?.barcode || fp?.barcode || '', name: (i||s)?.name||'', qs, qi, diff });
+                    // تحديد رقم الصنف والباركود بالقاعدة: الداش = رقم صنف، أرقام فقط = باركود
+                    const isDash    = /^[\d]+-[\d-]+$/.test(k);
+                    const isDigits  = /^\d+$/.test(k);
+                    const rawItemNo = (i||s)?.item_no || fp?.item_no || (isDash  ? k : '');
+                    const rawBc     = i?.barcode       || fp?.barcode  || (isDigits ? k : '');
+                    rows.push({ itemNo: rawItemNo, barcode: rawBc, name: (i||s)?.name||'', qs, qi, diff });
                     if (diff > 0) cntInc++; else if (diff < 0) cntDec++; else if (qi > 0) cntMatch++;
                 }
                 _cache.cmpRows = { rows, cntInc, cntDec, cntMatch, invLen: inv.length, stockLen: stock.length };
@@ -2703,22 +2734,26 @@
             const lblCounted = t('thCounted');
 
             const cmpHdr = `<div style="display:flex;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.72rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;gap:8px;">
-                <span style="flex:1;">${t('thItemNo')} · ${t('thName')}</span>
+                <span style="flex:1;">${t('thItemNo')}</span>
+                <span style="flex:1;">${t('thBarcode')}</span>
                 <span style="min-width:36px;text-align:center;">${lblActual}</span>
                 <span style="min-width:36px;text-align:center;">${lblCounted}</span>
                 <span style="min-width:44px;text-align:center;">${t('thDiff')}</span>
             </div>`;
             const vl = _getOrCreateVL('comparisonTableDiv', {
-                rowHeight: 52,
+                rowHeight: 58,
                 renderRow: (r) => {
                     const isPos=r.diff>0, isNeg=r.diff<0, isZero=r.diff===0&&r.qi>0;
                     const bg  = isPos?'rgba(0,180,100,0.09)':isNeg?'rgba(220,60,60,0.09)':isZero?'rgba(0,120,220,0.09)':'';
                     const clr = isPos?'#10b981':isNeg?'#fb7185':isZero?'#60a5fa':'var(--text)';
                     const icon= isPos?'⬆':isNeg?'⬇':isZero?'✓':'—';
-                    return `<div style="display:flex;align-items:center;padding:9px 12px;background:${bg};border-bottom:1px solid rgba(255,255,255,0.05);gap:8px;min-height:52px;">
+                    return `<div style="display:flex;align-items:center;padding:9px 12px;background:${bg};border-bottom:1px solid rgba(255,255,255,0.05);gap:8px;min-height:58px;">
                         <div style="flex:1;min-width:0;">
-                            <div style="font-size:0.76rem;font-weight:700;color:${clr};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.itemNo||r.barcode)}</div>
+                            <div style="font-size:0.76rem;font-weight:700;color:${clr};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.itemNo||'—')}</div>
                             <div style="font-size:0.7rem;color:${clr};opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(r.name)}</div>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:0.7rem;color:var(--neutral);font-family:'Courier New',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.barcode||'—')}</div>
                         </div>
                         <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px;">
                             <span style="font-size:0.62rem;color:var(--text-dim);">${lblActual}</span>
@@ -2741,20 +2776,37 @@
             await _ensureCache('prods');
             const prods = _cache.prods || [];
             document.getElementById('totalProductsStat').innerText = prods.length;
-            const prodsHdr = `<div style="display:flex;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.75rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;gap:8px;">
-                <span style="flex:1;">${t('thItemNo')} · ${t('thName')}</span>
-                <span style="min-width:52px;text-align:center;">${t('thAction')}</span>
+            const prodsHdr = `<div style="display:grid;grid-template-columns:1fr 1fr 70px;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.75rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;gap:8px;">
+                <span>${t('thItemNo')}</span>
+                <span>${t('thBarcode')}</span>
+                <span style="text-align:center;">${t('thAction')}</span>
             </div>`;
             const vl = _getOrCreateVL('productsTableContainer', {
-                rowHeight: 58,
-                renderRow: (p) => `<div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);gap:8px;min-height:58px;">
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-size:0.76rem;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.item_no||p.barcode||'-')}</div>
-                        <div style="font-size:0.72rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(p.name||'-')}</div>
-                        <div style="font-size:0.64rem;color:var(--text-dim);margin-top:1px;">${escapeHtml(p.barcode||'')}</div>
-                    </div>
-                    <button class="icon-btn" onclick="window.deleteProductById('${p.id}')" style="flex-shrink:0;font-size:0.7rem;padding:5px 10px;">${t('deleteBtn')}</button>
-                </div>`
+                rowHeight: 66,
+                renderRow: (p) => {
+                    const priceHtml = (p.price_orig || p.price_sale)
+                        ? `<div style="font-size:0.67rem;color:#f59e0b;margin-top:2px;">
+                             ${p.price_sale || p.price_orig}
+                             ${p.price_orig && p.price_sale && p.price_orig !== p.price_sale
+                               ? `<span style="text-decoration:line-through;color:var(--text-dim);margin-right:3px;">${p.price_orig}</span>`
+                               : ''}
+                           </div>`
+                        : '';
+                    return `<div style="display:grid;grid-template-columns:1fr 1fr 70px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);gap:8px;min-height:66px;">
+                        <div style="min-width:0;">
+                            <div style="font-size:0.76rem;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.item_no||'—')}</div>
+                            <div style="font-size:0.72rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(p.name||'—')}</div>
+                        </div>
+                        <div style="min-width:0;">
+                            <div style="font-size:0.72rem;color:var(--text-muted);font-family:'Courier New',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.barcode||'—')}</div>
+                            ${priceHtml}
+                        </div>
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                            <button onclick="window.editProductById('${p.id}')" style="width:100%;font-size:0.65rem;padding:4px 6px;background:rgba(14,165,233,0.12);color:#38bdf8;border:1px solid rgba(14,165,233,0.25);border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;">✏️</button>
+                            <button onclick="window.deleteProductById('${p.id}')" style="width:100%;font-size:0.65rem;padding:4px 6px;background:rgba(220,38,38,0.1);color:#fb7185;border:1px solid rgba(220,38,38,0.2);border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;">${t('deleteBtn')}</button>
+                        </div>
+                    </div>`;
+                }
             }, prodsHdr);
             vl.setItems(prods);
         }
@@ -3059,11 +3111,16 @@
                     { header:'الكمية',    key:'qty',     width:10 },
                     { header:'آخر مسح',  key:'time',    width:22 },
                 ],
-                rows: inv.map(i => ({
-                    barcode: i.barcode && i.barcode !== i.key ? i.barcode : '',
-                    key: i.key, name: i.name, qty: i.qty,
-                    time: i.timestamp ? new Date(i.timestamp).toLocaleString('ar-SA') : ''
-                }))
+                rows: inv.map(i => {
+                    const isDash   = /^[\d]+-[\d-]+$/.test(i.key);
+                    const isDigits = /^\d+$/.test(i.key);
+                    const itemNo  = i.item_no  || (isDash   ? i.key : '');
+                    const barcode = i.barcode  || (isDigits ? i.key : '');
+                    return {
+                        barcode, key: itemNo, name: i.name, qty: i.qty,
+                        time: i.timestamp ? new Date(i.timestamp).toLocaleString('ar-SA') : ''
+                    };
+                })
             });
             showToast(t('exportedInv'));
         } catch(err) {
@@ -3116,8 +3173,8 @@
                     { header:'الباركود',    key:'barcode',    width:22 },
                     { header:'رقم الصنف',   key:'item_no',    width:18 },
                     { header:'الاسم',       key:'name',       width:40 },
-                    { header:'السعر الأصلي', key:'price_orig', width:16 },
-                    { header:'سعر الخصم',   key:'price_sale', width:16 },
+                    { header:'السعر الأساسي', key:'price_orig', width:16 },
+                    { header:'السعر بعد الخصم',   key:'price_sale', width:16 },
                 ],
                 rows: prods.map(p => ({
                     barcode:    p.barcode    || '',
@@ -3149,10 +3206,12 @@
             const rows = [...allKeys].map(k => {
                 const i = inv.find(x => x.key === k), s = stock.find(x => x.key === k);
                 const qi = i ? i.qty : 0, qs = s ? s.qty : 0, diff = qi - qs;
-                const fromInv  = i?.barcode && i.barcode !== k ? i.barcode : '';
+                const isDash   = /^[\d]+-[\d-]+$/.test(k);
+                const isDigits = /^\d+$/.test(k);
                 const fromProd = prods.find(p => p.item_no === k || p.barcode === k);
-                const bc = fromInv || (fromProd?.barcode && fromProd.barcode !== k ? fromProd.barcode : '');
-                return { bc, k, name: (i||s)?.name||'', qs, qi, diff };
+                const itemNo   = (i||s)?.item_no || fromProd?.item_no || (isDash   ? k : '');
+                const bc       = i?.barcode       || fromProd?.barcode  || (isDigits ? k : '');
+                return { bc, k: itemNo || bc || k, itemNo, name: (i||s)?.name||'', qs, qi, diff };
             });
 
             updateProgress(50, 'إنشاء ورقة العمل...');
@@ -3242,17 +3301,77 @@
             deleteRequest.onblocked = () => window.location.reload();
         });
     };
-    document.getElementById('globalManualBtn').onclick = () => document.getElementById('productModal').style.display = 'flex';
+    document.getElementById('globalManualBtn').onclick = () => {
+        // فتح بوضع الإضافة
+        document.getElementById('productModalTitle').innerHTML = '➕ <span data-i18n="addProduct">' + t('addProduct') + '</span>';
+        document.getElementById('modalEditId').value = '';
+        document.getElementById('modalItemNo').value = '';
+        document.getElementById('modalName').value = '';
+        document.getElementById('modalBarcode').value = '';
+        document.getElementById('modalQty').value = '0';
+        document.getElementById('modalPriceOrig').value = '';
+        document.getElementById('modalPriceSale').value = '';
+        document.getElementById('productModal').style.display = 'flex';
+    };
     document.getElementById('closeModalBtn').onclick = () => document.getElementById('productModal').style.display = 'none';
     document.getElementById('saveProductBtn').onclick = async () => {
-        let itemNo = document.getElementById('modalItemNo').value.trim(), name = document.getElementById('modalName').value.trim(), barcode = document.getElementById('modalBarcode').value.trim(), qty = parseFloat(document.getElementById('modalQty').value)||0;
-        if ((!itemNo && !barcode) || !name) { alert("يرجى ملء الحقول الأساسية"); return; }
-        const tx = db.transaction(["products","stock"], "readwrite");
-        tx.objectStore("products").add({ id: generateUniqueId(), item_no: itemNo, barcode, name, sourceId: "manual" });
-        if (qty>0) tx.objectStore("stock").put({ key: itemNo||barcode, name, qty });
-        await new Promise(r=>{ tx.oncomplete=r; });
-        document.getElementById('productModal').style.display='none';
-        updateAllUI(["prods","stock","cmpRows"]); showToast(t('productAdded'));
+        const editId   = document.getElementById('modalEditId').value.trim();
+        const itemNo   = document.getElementById('modalItemNo').value.trim();
+        const name     = document.getElementById('modalName').value.trim();
+        const barcode  = document.getElementById('modalBarcode').value.trim();
+        const qty      = parseFloat(document.getElementById('modalQty').value) || 0;
+        const priceOrig = parseFloat(document.getElementById('modalPriceOrig').value) || 0;
+        const priceSale = parseFloat(document.getElementById('modalPriceSale').value) || 0;
+        if ((!itemNo && !barcode) || !name) { alert(t('fillRequired') || 'يرجى ملء الحقول الأساسية'); return; }
+
+        if (editId) {
+            // وضع التعديل — ابحث عن المنتج وحدّثه
+            const tx = db.transaction(["products","stock"], "readwrite");
+            const store = tx.objectStore("products");
+            const req = store.get(editId);
+            req.onsuccess = () => {
+                const existing = req.result;
+                if (existing) {
+                    existing.item_no    = itemNo;
+                    existing.name       = name;
+                    existing.barcode    = barcode;
+                    existing.price_orig = priceOrig || undefined;
+                    existing.price_sale = priceSale || undefined;
+                    store.put(existing);
+                }
+                if (qty > 0) tx.objectStore("stock").put({ key: itemNo || barcode, name, qty });
+            };
+            await new Promise(r => { tx.oncomplete = r; });
+            showToast('✅ ' + (t('productUpdated') || 'تم تحديث المنتج'));
+        } else {
+            // وضع الإضافة
+            const tx = db.transaction(["products","stock"], "readwrite");
+            tx.objectStore("products").add({ id: generateUniqueId(), item_no: itemNo, barcode, name, price_orig: priceOrig || undefined, price_sale: priceSale || undefined, sourceId: "manual" });
+            if (qty > 0) tx.objectStore("stock").put({ key: itemNo || barcode, name, qty });
+            await new Promise(r => { tx.oncomplete = r; });
+            showToast(t('productAdded'));
+        }
+        document.getElementById('productModal').style.display = 'none';
+        updateAllUI(["prods","stock","cmpRows"]);
+    };
+
+    window.editProductById = async function(id) {
+        const tx = db.transaction("products", "readonly");
+        const p  = await new Promise(r => tx.objectStore("products").get(id).onsuccess = e => r(e.target.result));
+        if (!p) return;
+        // فتح modal بوضع التعديل
+        document.getElementById('productModalTitle').innerHTML = '✏️ ' + (t('editProduct') || 'تعديل منتج');
+        document.getElementById('modalEditId').value      = p.id;
+        document.getElementById('modalItemNo').value      = p.item_no  || '';
+        document.getElementById('modalName').value        = p.name     || '';
+        document.getElementById('modalBarcode').value     = p.barcode  || '';
+        document.getElementById('modalPriceOrig').value   = p.price_orig || '';
+        document.getElementById('modalPriceSale').value   = p.price_sale || '';
+        // جلب الكمية من المرجع
+        const stx = db.transaction("stock", "readonly");
+        const stk = await new Promise(r => stx.objectStore("stock").get(p.item_no || p.barcode).onsuccess = e => r(e.target.result));
+        document.getElementById('modalQty').value = stk ? stk.qty : 0;
+        document.getElementById('productModal').style.display = 'flex';
     };
     document.getElementById('stockUploadArea').addEventListener('click',()=>document.getElementById('stockFileInput').click());
     document.getElementById('dbUploadArea').addEventListener('click',()=>document.getElementById('dbFileInput').click());
@@ -3629,6 +3748,9 @@
             productsMergeDesc: 'دمج: يُضيف المنتجات الجديدة مع الحفاظ على الموجودة',
             processProducts: 'معالجة ورفع المنتجات',
             exportProducts: 'تصدير المنتجات',
+            editProduct: 'تعديل منتج',
+            productUpdated: 'تم تحديث المنتج',
+            fillRequired: 'يرجى ملء الحقول الأساسية',
             clearProducts: 'مسح كل المنتجات',
             // toast / dynamic strings
             toastClearConfirm: 'مسح كل الجرد والسجل التفصيلي؟',
@@ -3645,7 +3767,7 @@
             thActual: 'الفعلي',
             thCounted: 'المجرود',
             thDiff: 'الفرق',
-            thAction: '',
+            thAction: 'إجراء',
             deleteBtn: 'حذف',
             // scan log card buttons
             btnMinus: 'نقص',
@@ -3760,8 +3882,8 @@
             pricesResultsCount: 'نتيجة — انقر لعرض التفاصيل',
             pricesLabelItemNo: '🔢 رقم الصنف',
             pricesLabelBarcode: '📦 الباركود',
-            pricesLabelOrigPrice: 'السعر الأصلي',
-            pricesLabelSalePrice: 'بعد الخصم',
+            pricesLabelOrigPrice: 'السعر الأساسي',
+            pricesLabelSalePrice: 'السعر بعد الخصم',
             pricesLabelDiscount: 'الخصم',
             pricesLabelStock: 'الرصيد',
             pricesLabelPcs: 'قطعة',
@@ -3826,6 +3948,9 @@
             productsMergeDesc: 'Merge: adds new products while keeping existing ones',
             processProducts: 'Process & Upload Products',
             exportProducts: 'Export Products',
+            editProduct: 'Edit Product',
+            productUpdated: 'Product updated',
+            fillRequired: 'Please fill required fields',
             clearProducts: 'Clear All Products',
             toastClearConfirm: 'Clear all inventory and scan log?',
             toastCleared: 'Inventory and log cleared',
@@ -3949,8 +4074,8 @@
             pricesResultsCount: 'result(s) — tap to view details',
             pricesLabelItemNo: '🔢 Item No.',
             pricesLabelBarcode: '📦 Barcode',
-            pricesLabelOrigPrice: 'Original Price',
-            pricesLabelSalePrice: 'Sale Price',
+            pricesLabelOrigPrice: 'Base Price',
+            pricesLabelSalePrice: 'Discounted Price',
             pricesLabelDiscount: 'Discount',
             pricesLabelStock: 'Stock',
             pricesLabelPcs: 'pcs',
@@ -4224,10 +4349,6 @@ function renderPriceProduct(p) {
             </div>` : ''}
         </div>
         <div style="display:flex;gap:8px;">
-            <button data-edit-code="${escapeHtml(p[0])}" class="pr-edit-btn"
-                style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">
-                ${t('pricesEditBtn')}
-            </button>
         </div>
     </div>`;
 }
