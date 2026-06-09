@@ -1541,17 +1541,12 @@
 
             </div><!-- end search div margin-bottom:14px -->
 
-            <!-- قائمة المنتجات وبحث فيها -->
+            <!-- قائمة المنتجات -->
             <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:14px;">
                 <div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
                     <i class="fas fa-list" style="color:#f59e0b;"></i> <span data-i18n="pricesListTitle">قائمة المنتجات</span>
                     <span id="prices-list-count" style="background:rgba(245,158,11,0.1);color:#f59e0b;border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:1px 10px;font-size:0.75rem;margin-right:4px;">0</span>
                 </div>
-                <input class="input-field search-input" type="text" id="prices-list-search"
-                    data-i18n-placeholder="pricesListSearch"
-                    placeholder="🔍 ابحث باسم المنتج أو الصنف أو الباركود..."
-                    style="margin-bottom:8px;"
-                    oninput="filterPricesList()">
                 <div id="prices-product-list" style="max-height:340px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--surface3) transparent;"></div>
                 <button id="prices-load-more-btn" onclick="loadMorePrices()" style="display:none;width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--accent);font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;" data-i18n="pricesLoadMore">تحميل المزيد</button>
             </div>
@@ -1994,7 +1989,7 @@
                                 const price_orig = colMap.price_orig !== null && colMap.price_orig !== undefined ? (parseFloat(row[colMap.price_orig]) || 0) : 0;
                                 const price_sale = colMap.price_sale !== null && colMap.price_sale !== undefined ? (parseFloat(row[colMap.price_sale]) || price_orig) : price_orig;
                                 if (!barcode && !itemno) continue;
-                                store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name || 'بدون اسم', price_orig, price_sale, sourceId }); totalAdded++;
+                                store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name || t('noName'), price_orig, price_sale, sourceId }); totalAdded++;
                             }
                             await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
                         }
@@ -2221,13 +2216,13 @@
 
         const elapsed = now - lastScanTime;
         if (elapsed < scanDelay) {
-            setScanStatus('locked', `انتظر ${((scanDelay - elapsed)/1000).toFixed(1)}s`);
+            setScanStatus('locked', `⏳ ${((scanDelay - elapsed)/1000).toFixed(1)}s`);
             return;
         }
 
         isScanLocked = true;
         lastScanTime = now;
-        setScanStatus('scanning', `جاري البحث: ${cleanVal}`);
+        setScanStatus('scanning', `${t('scanStatusProcessing')}: ${cleanVal}`);
 
         const infoEl = document.getElementById('lastScanInfo');
         if (infoEl) infoEl.textContent = `آخر مسح: ${new Date().toLocaleTimeString('ar-SA')}`;
@@ -2251,7 +2246,7 @@
                 await addToInventory(matchKey, match.name, match.barcode, match.item_no);
                 playBeep(true); flashCard('green');
                 showToast(`✓ ${match.name}`, false, 1200);
-                setScanStatus('ready', `✓ تم جرد: ${match.name}`);
+                setScanStatus('ready', `${t('scanStatusCounted')}: ${match.name}`);
                 updateAllUI(["inv","scanLog","cmpRows"]); isScanLocked = false; return;
             }
             const stockStore = tx.objectStore("stock");
@@ -2266,7 +2261,7 @@
                 await addToInventory(itemNoVal, stockItem.name, barcodeVal);
                 playBeep(true); flashCard('green');
                 showToast(`${t('autoAdded')}${stockItem.name}`, false, 1500);
-                setScanStatus('ready', `✓ ${stockItem.name}`);
+                setScanStatus('ready', `${t('scanStatusCounted')}: ${stockItem.name}`);
                 updateAllUI(["inv","scanLog","cmpRows"]); isScanLocked = false; return;
             }
             // لم يُعثر عليه
@@ -2277,11 +2272,11 @@
             await addToInventory(unknownKey, "❓ غير معروف", unknownBarcode, unknownItemNo);
             playBeep(false); flashCard('red');
             showToast(`${t('notRegistered')}${cleanVal}`, true, 2000);
-            setScanStatus('idle', `⚠️ غير معروف: ${cleanVal}`);
+            setScanStatus('idle', `${t('scanStatusUnknown')}: ${cleanVal}`);
             updateAllUI(["inv","scanLog","cmpRows"]);
         } catch (err) {
             console.error(err);
-            setScanStatus('idle', 'خطأ في المعالجة');
+            setScanStatus('idle', t('scanStatusError'));
         }
         isScanLocked = false;
     }
@@ -2359,7 +2354,7 @@
         const cameraDiv = document.getElementById('cameraDiv');
         const scanLine = document.getElementById('scanLine');
         cameraDiv.classList.remove('hidden');
-        setScanStatus('scanning', 'جاري تشغيل الكاميرا...');
+        setScanStatus('scanning', t('scanStatusStarting'));
         try {
             const targetId = cameraId || currentCameraId || (availableCameras[0]?.id);
             if (!targetId) throw new Error("لا توجد كاميرا متاحة");
@@ -2401,7 +2396,7 @@
             cameraDiv.classList.add('hidden');
             if (scanLine) scanLine.style.display = 'none';
             document.getElementById('closeCamBtn').style.display = 'none';
-            setScanStatus('idle', 'فشل تشغيل الكاميرا');
+            setScanStatus('idle', t('scanStatusFailed'));
             scanningActive = false;
         }
     }
@@ -2413,7 +2408,7 @@
         document.getElementById('closeCamBtn').style.display = 'none';
         const scanLine = document.getElementById('scanLine');
         if (scanLine) scanLine.style.display = 'none';
-        setScanStatus('idle', 'جاهز للمسح');
+        setScanStatus('idle', t('scanStatusReady'));
     }
 
     async function switchCamera() {
@@ -3103,13 +3098,13 @@
             inv.sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
             await exportStyledExcel({
                 fileName: `جرد_${DATE_STR}.xlsx`,
-                sheetName: 'الجرد',
+                sheetName: t('xlsSheetInv'),
                 columns: [
-                    { header:'الباركود',  key:'barcode', width:22 },
-                    { header:'رقم الصنف', key:'key',     width:18 },
-                    { header:'الاسم',     key:'name',    width:36 },
-                    { header:'الكمية',    key:'qty',     width:10 },
-                    { header:'آخر مسح',  key:'time',    width:22 },
+                    { header: t('xlsBarcode'), key:'barcode', width:22 },
+                    { header: t('xlsItemNo'),  key:'key',     width:18 },
+                    { header: t('xlsName'),    key:'name',    width:36 },
+                    { header: t('xlsQty'),     key:'qty',     width:10 },
+                    { header: t('xlsLastScan'),key:'time',    width:22 },
                 ],
                 rows: inv.map(i => {
                     const isDash   = /^[\d]+-[\d-]+$/.test(i.key);
@@ -3141,11 +3136,11 @@
             updateProgress(60, t('creatingFile'));
             await exportStyledExcel({
                 fileName: `مرجع_${DATE_STR}.xlsx`,
-                sheetName: 'المرجع',
+                sheetName: t('xlsSheetRef'),
                 columns: [
-                    { header:'رقم الصنف',      key:'key',  width:18 },
-                    { header:'الاسم',           key:'name', width:36 },
-                    { header:'الكمية المرجعية', key:'qty',  width:16 },
+                    { header: t('xlsItemNo'), key:'key',  width:18 },
+                    { header: t('xlsName'),   key:'name', width:36 },
+                    { header: t('xlsRefQty'), key:'qty',  width:16 },
                 ],
                 rows: stock.map(s => ({ key: s.key, name: s.name, qty: s.qty }))
             });
@@ -3168,13 +3163,13 @@
             updateProgress(60, t('creatingFile'));
             await exportStyledExcel({
                 fileName: `منتجات_${DATE_STR}.xlsx`,
-                sheetName: 'المنتجات',
+                sheetName: t('xlsSheetProds'),
                 columns: [
-                    { header:'الباركود',    key:'barcode',    width:22 },
-                    { header:'رقم الصنف',   key:'item_no',    width:18 },
-                    { header:'الاسم',       key:'name',       width:40 },
-                    { header:'السعر الأساسي', key:'price_orig', width:16 },
-                    { header:'السعر بعد الخصم',   key:'price_sale', width:16 },
+                    { header: t('xlsBarcode'),   key:'barcode',    width:22 },
+                    { header: t('xlsItemNo'),    key:'item_no',    width:18 },
+                    { header: t('xlsName'),      key:'name',       width:40 },
+                    { header: t('xlsPriceOrig'), key:'price_orig', width:16 },
+                    { header: t('xlsPriceSale'), key:'price_sale', width:16 },
                 ],
                 rows: prods.map(p => ({
                     barcode:    p.barcode    || '',
@@ -3201,7 +3196,7 @@
                 new Promise(r => tx.objectStore("stock").getAll().onsuccess     = e => r(e.target.result)),
                 new Promise(r => tx.objectStore("products").getAll().onsuccess  = e => r(e.target.result))
             ]);
-            updateProgress(25, 'بناء بيانات المقارنة...');
+            updateProgress(25, t('progressBuildingData'));
             const allKeys = new Set([...inv.map(i => i.key), ...stock.map(s => s.key)]);
             const rows = [...allKeys].map(k => {
                 const i = inv.find(x => x.key === k), s = stock.find(x => x.key === k);
@@ -3214,7 +3209,7 @@
                 return { bc, k: itemNo || bc || k, itemNo, name: (i||s)?.name||'', qs, qi, diff };
             });
 
-            updateProgress(50, 'إنشاء ورقة العمل...');
+            updateProgress(50, t('progressCreatingSheet'));
             // تحقق من تحميل ExcelJS
             if (!window.ExcelJS) {
                 await new Promise((resolve, reject) => {
@@ -3230,13 +3225,13 @@
 
             // رؤوس الأعمدة
             ws.columns = [
-                { header:'الباركود',  key:'bc',   width:20 },
-                { header:'رقم الصنف', key:'k',    width:18 },
-                { header:'الاسم',     key:'name',  width:40 },
-                { header:'الفعلي',    key:'qs',    width:12 },
-                { header:'المجرود',   key:'qi',    width:12 },
-                { header:'الفرق',     key:'diff',  width:12 },
-                { header:'الحالة',    key:'status',width:12 },
+                { header: t('xlsBarcode'), key:'bc',     width:20 },
+                { header: t('xlsItemNo'),  key:'k',      width:18 },
+                { header: t('xlsName'),    key:'name',   width:40 },
+                { header: t('xlsActual'),  key:'qs',     width:12 },
+                { header: t('xlsCounted'), key:'qi',     width:12 },
+                { header: t('xlsDiff'),    key:'diff',   width:12 },
+                { header: t('xlsStatus'),  key:'status', width:12 },
             ];
 
             // تنسيق رأس الجدول
@@ -3251,10 +3246,10 @@
 
             // إضافة الصفوف بالألوان
             const colorMap = {
-                increase: { fill:'FFD1FAE5', font:'FF065F46', label:'زيادة' },
-                decrease: { fill:'FFFEE2E2', font:'FF991B1B', label:'نقص'   },
-                match:    { fill:'FFE0F2FE', font:'FF0369A1', label:'مطابق' },
-                none:     { fill:'FFF3F4F6', font:'FF6B7280', label:'—'     },
+                increase: { fill:'FFD1FAE5', font:'FF065F46', label: t('xlsStatusIncrease') },
+                decrease: { fill:'FFFEE2E2', font:'FF991B1B', label: t('xlsStatusDecrease') },
+                match:    { fill:'FFE0F2FE', font:'FF0369A1', label: t('xlsStatusMatch')    },
+                none:     { fill:'FFF3F4F6', font:'FF6B7280', label:'—'                      },
             };
 
             rows.forEach(r => {
@@ -3279,7 +3274,7 @@
             // تجميد الصف الأول
             ws.views = [{ state:'frozen', ySplit:1, rightToLeft:true }];
 
-            updateProgress(85, 'كتابة الملف...');
+            updateProgress(85, t('progressWritingFile'));
             const buf  = await wb.xlsx.writeBuffer();
             const fileName = 'مقارنة_الجرد_' + new Date().toLocaleDateString('ar-SA').replace(/\//g,'-') + '.xlsx';
             downloadFile(buf, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -3601,7 +3596,7 @@
             if (cameraDiv) cameraDiv.classList.add('hidden');
             const closeCamBtn = document.getElementById('closeCamBtn');
             if (closeCamBtn) closeCamBtn.style.display = 'none';
-            setScanStatus('idle', 'اضغط فتح لبدء المسح');
+            setScanStatus('idle', t('scanStatusPressOpen'));
         }
         document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
         this.classList.add('active');
@@ -3891,6 +3886,41 @@
             pricesEditNote: 'للتعديل استخدم تبويب المنتجات',
             pricesNoProducts: 'لا توجد منتجات مرفوعة بعد',
             pricesCameraLabel: '📷 الكاميرا:',
+            // عناوين أعمدة Excel
+            xlsBarcode: 'الباركود',
+            xlsItemNo: 'رقم الصنف',
+            xlsName: 'الاسم',
+            xlsQty: 'الكمية',
+            xlsLastScan: 'آخر مسح',
+            xlsRefQty: 'الكمية المرجعية',
+            xlsPriceOrig: 'السعر الأساسي',
+            xlsPriceSale: 'السعر بعد الخصم',
+            xlsActual: 'الفعلي',
+            xlsCounted: 'المجرود',
+            xlsDiff: 'الفرق',
+            xlsStatus: 'الحالة',
+            xlsSheetInv: 'الجرد',
+            xlsSheetRef: 'المرجع',
+            xlsSheetProds: 'المنتجات',
+            xlsSheetCmp: 'المقارنة',
+            xlsStatusIncrease: 'زيادة',
+            xlsStatusDecrease: 'نقص',
+            xlsStatusMatch: 'مطابق',
+            // شريط التقدم
+            progressBuildingData: 'بناء بيانات المقارنة...',
+            progressCreatingSheet: 'إنشاء ورقة العمل...',
+            progressWritingFile: 'كتابة الملف...',
+            // السكانر
+            scanStatusProcessing: 'جاري البحث',
+            scanStatusCounted: '✓ تم جرد',
+            scanStatusUnknown: '⚠️ غير معروف',
+            scanStatusError: 'خطأ في المعالجة',
+            scanStatusStarting: 'جاري تشغيل الكاميرا...',
+            scanStatusFailed: 'فشل تشغيل الكاميرا',
+            scanStatusReady: 'جاهز للمسح',
+            scanStatusPressOpen: 'اضغط فتح لبدء المسح',
+            // منتجات
+            noName: 'بدون اسم',
         },
         en: {
             appTitle: 'Smart Inventory System',
@@ -4083,6 +4113,41 @@
             pricesEditNote: 'To edit, use the Products tab',
             pricesNoProducts: 'No products uploaded yet',
             pricesCameraLabel: '📷 Camera:',
+            // Excel column headers
+            xlsBarcode: 'Barcode',
+            xlsItemNo: 'Item No.',
+            xlsName: 'Name',
+            xlsQty: 'Quantity',
+            xlsLastScan: 'Last Scan',
+            xlsRefQty: 'Reference Qty',
+            xlsPriceOrig: 'Base Price',
+            xlsPriceSale: 'Discounted Price',
+            xlsActual: 'Actual',
+            xlsCounted: 'Counted',
+            xlsDiff: 'Difference',
+            xlsStatus: 'Status',
+            xlsSheetInv: 'Inventory',
+            xlsSheetRef: 'Reference',
+            xlsSheetProds: 'Products',
+            xlsSheetCmp: 'Comparison',
+            xlsStatusIncrease: 'Increase',
+            xlsStatusDecrease: 'Decrease',
+            xlsStatusMatch: 'Match',
+            // Progress bar
+            progressBuildingData: 'Building comparison data...',
+            progressCreatingSheet: 'Creating worksheet...',
+            progressWritingFile: 'Writing file...',
+            // Scanner
+            scanStatusProcessing: 'Searching',
+            scanStatusCounted: '✓ Counted',
+            scanStatusUnknown: '⚠️ Unknown',
+            scanStatusError: 'Processing error',
+            scanStatusStarting: 'Starting camera...',
+            scanStatusFailed: 'Camera failed to start',
+            scanStatusReady: 'Ready to scan',
+            scanStatusPressOpen: 'Press Open to start scanning',
+            // Products
+            noName: 'No name',
         }
     };
 
@@ -4180,12 +4245,27 @@ async function rebuildPricesIndex() {
         const stk  = stockMap[p.item_no] !== undefined ? stockMap[p.item_no]
                    : stockMap[p.barcode] !== undefined ? stockMap[p.barcode] : 0;
         const idx  = PR_LIST.length;
-        PR_LIST.push([code, name, orig, sale, disc, stk]);
+        PR_LIST.push([code, name, orig, sale, disc, stk, p.item_no||'', p.barcode||'']);
         if (p.item_no)  PR_CODE_MAP[p.item_no]    = idx;
         if (p.barcode)  PR_CODE_MAP[p.barcode]     = idx;
         if (p.barcode)  PR_BARCODE_MAP[p.barcode]  = idx;
         if (p.item_no && p.barcode && p.item_no !== p.barcode)
             PR_BARCODE_MAP[p.barcode] = idx;
+    });
+
+    // أضف منتجات المرجع غير الموجودة في products
+    const inProds = new Set([
+        ...prods.map(p => p.item_no).filter(Boolean),
+        ...prods.map(p => p.barcode).filter(Boolean),
+    ]);
+    stockArr.forEach(s => {
+        if (inProds.has(s.key)) return; // موجود بالفعل
+        const code = s.key;
+        const name = s.name || code;
+        const idx  = PR_LIST.length;
+        PR_LIST.push([code, name, 0, 0, 0, s.qty, /[^0-9]/.test(code) ? code : '', /^\d+$/.test(code) ? code : '']);
+        PR_CODE_MAP[code]    = idx;
+        if (/^\d+$/.test(code)) PR_BARCODE_MAP[code] = idx;
     });
 }
 
@@ -4324,10 +4404,10 @@ function renderPriceProduct(p) {
         <div style="display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.1);color:var(--accent);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:8px;">${t('pricesFound')}</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:4px;color:var(--text);">${escapeHtml(p[1])}</div>
         <div style="background:var(--surface3);border-radius:8px;padding:8px 10px;margin-bottom:12px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+            ${p[6] ? `<div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:3px;">
                 <span style="color:var(--text-muted);font-weight:600;">${t('pricesLabelItemNo')}</span>
-                <span style="color:var(--text);font-weight:700;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 8px;">${escapeHtml(p[0])}</span>
-            </div>
+                <span style="color:var(--text);font-weight:700;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 8px;">${escapeHtml(p[6])}</span>
+            </div>` : ''}
             ${barcodeHtml}
         </div>
         <div style="display:grid;grid-template-columns:${stock !== null ? 'repeat(4,1fr)' : 'repeat(3,1fr)'};gap:8px;margin-bottom:10px;">
