@@ -1206,13 +1206,17 @@
             </div>
 
             <!-- رأس قائمة الجرد -->
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:20px; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:20px; margin-bottom:8px;">
                 <h4 style="display:flex; align-items:center; gap:8px; color:var(--text-muted); font-size:0.82rem;">
                     <i class="fas fa-list-ol" style="color:var(--accent);"></i> <span data-i18n="detailedLog">سجل المسحات التفصيلي</span>
                     <span id="inventoryCount" style="background:rgba(16,185,129,0.08); color:var(--accent); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:1px 10px; font-size:0.78rem;">0</span>
                 </h4>
                 <span id="lastScanInfo" style="font-size:0.68rem; color:var(--text-dim);"></span>
             </div>
+            <input id="scanLogSearch" type="text" data-i18n-placeholder="searchScanLog"
+                placeholder="🔍 ابحث في السجل..."
+                oninput="window.filterScanLog(this.value)"
+                style="width:100%;padding:10px 14px;margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.8rem;box-sizing:border-box;">
             <div id="inventoryListContainer" class="inventory-list"></div>
         </div>
     </div>
@@ -1979,19 +1983,51 @@
                         for (let start = 0; start < dataRows.length; start += BATCH_SIZE) {
                             const pct = 30 + ((fi / pendingProductFiles.length) + ((start / dataRows.length) / pendingProductFiles.length)) * 65;
                             updateProgress(pct, `${t('processing')} ${Math.min(start + BATCH_SIZE, dataRows.length)} / ${dataRows.length}`);
-                            const batch = dataRows.slice(start, Math.min(start + BATCH_SIZE, dataRows.length));
-                            const tx = db.transaction(["products"], "readwrite"); const store = tx.objectStore("products");
+                        const batch = dataRows.slice(start, Math.min(start + BATCH_SIZE, dataRows.length));
+
+                        if (dbUploadMode === 'merge') {
+                            // في الدمج: ابحث عن كل منتج موجود بـ item_no أو barcode وحدّثه، وإلا أضف جديد
+                            const allExisting = await new Promise(r => {
+                                const rtx = db.transaction("products","readonly");
+                                rtx.objectStore("products").getAll().onsuccess = e => r(e.target.result);
+                            });
+                            const byItemNo  = new Map(allExisting.filter(p=>p.item_no).map(p=>[p.item_no, p]));
+                            const byBarcode = new Map(allExisting.filter(p=>p.barcode).map(p=>[p.barcode, p]));
+
+                            const tx = db.transaction(["products"], "readwrite");
+                            const store = tx.objectStore("products");
                             for (const row of batch) {
                                 if (!Array.isArray(row)) continue;
-                                const barcode = colMap.barcode !== null ? String(row[colMap.barcode]||'').trim().replace(/\.0+$/,'') : '';
-                                const itemno  = colMap.itemno  !== null ? String(row[colMap.itemno] ||'').trim().replace(/\.0+$/,'') : '';
-                                const name    = colMap.name    !== null ? String(row[colMap.name]   ||'').trim() : '';
+                                const barcode    = colMap.barcode    !== null ? String(row[colMap.barcode]   ||'').trim().replace(/\.0+$/,'') : '';
+                                const itemno     = colMap.itemno     !== null ? String(row[colMap.itemno]    ||'').trim().replace(/\.0+$/,'') : '';
+                                const name       = colMap.name       !== null ? String(row[colMap.name]      ||'').trim() : '';
                                 const price_orig = colMap.price_orig !== null && colMap.price_orig !== undefined ? (parseFloat(row[colMap.price_orig]) || 0) : 0;
                                 const price_sale = colMap.price_sale !== null && colMap.price_sale !== undefined ? (parseFloat(row[colMap.price_sale]) || price_orig) : price_orig;
                                 if (!barcode && !itemno) continue;
-                                store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name || t('noName'), price_orig, price_sale, sourceId }); totalAdded++;
+                                // ابحث عن الموجود
+                                const existing = (itemno && byItemNo.get(itemno)) || (barcode && byBarcode.get(barcode));
+                                if (existing) {
+                                    // حدّث الموجود مع الحفاظ على id
+                                    store.put({ ...existing, barcode: barcode||existing.barcode, item_no: itemno||existing.item_no, name: name||existing.name, price_orig: price_orig||existing.price_orig, price_sale: price_sale||existing.price_sale });
+                                } else {
+                                    store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name||t('noName'), price_orig, price_sale, sourceId }); totalAdded++;
+                                }
                             }
                             await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+                        } else {
+                            const tx = db.transaction(["products"], "readwrite"); const store = tx.objectStore("products");
+                            for (const row of batch) {
+                                if (!Array.isArray(row)) continue;
+                                const barcode    = colMap.barcode    !== null ? String(row[colMap.barcode]   ||'').trim().replace(/\.0+$/,'') : '';
+                                const itemno     = colMap.itemno     !== null ? String(row[colMap.itemno]    ||'').trim().replace(/\.0+$/,'') : '';
+                                const name       = colMap.name       !== null ? String(row[colMap.name]      ||'').trim() : '';
+                                const price_orig = colMap.price_orig !== null && colMap.price_orig !== undefined ? (parseFloat(row[colMap.price_orig]) || 0) : 0;
+                                const price_sale = colMap.price_sale !== null && colMap.price_sale !== undefined ? (parseFloat(row[colMap.price_sale]) || price_orig) : price_orig;
+                                if (!barcode && !itemno) continue;
+                                store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name||t('noName'), price_orig, price_sale, sourceId }); totalAdded++;
+                            }
+                            await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+                        }
                         }
                     } catch (err) { hideProgress(); showToast(`خطأ في ${file.name}: ${err.message}`, true); return; }
                 }
@@ -2573,32 +2609,41 @@
         if (tabId === 'tab-scan') {
             await _ensureCache('inv','scanLog');
             inventory = (_cache.inv || []).sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
-            const scanLog = (_cache.scanLog || []).sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
+            window._fullScanLog = (_cache.scanLog || []).sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
+            const scanLog = window._fullScanLog;
             const totalScans = scanLog.length;
             document.getElementById('inventoryCount').innerText     = totalScans;
             document.getElementById('totalInventoryStat').innerText = inventory.length;
             document.getElementById('sessionScansStat').innerText   = totalScans;
 
+            const q = (document.getElementById('scanLogSearch')?.value || '').toLowerCase().trim();
+            const filtered = q ? scanLog.filter(e =>
+                e.name?.toLowerCase().includes(q) ||
+                e.itemCode?.toLowerCase().includes(q) ||
+                (e.barcode||'').toLowerCase().includes(q)
+            ) : scanLog;
+
             const container = document.getElementById('inventoryListContainer');
-            if (!totalScans) {
+            if (!filtered.length) {
                 if (_vl['inventoryListContainer']) { _vl['inventoryListContainer'].destroy(); delete _vl['inventoryListContainer']; }
                 container.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text-dim);">
-                    <i class="fas fa-barcode" style="font-size:2rem;margin-bottom:10px;display:block;opacity:0.3;"></i>${t('noItems')}</div>`;
+                    <i class="fas fa-barcode" style="font-size:2rem;margin-bottom:10px;display:block;opacity:0.3;"></i>${q ? t('noResults')||'لا توجد نتائج' : t('noItems')}</div>`;
                 return;
             }
             const invMap = new Map(inventory.map(x => [x.key, x]));
             const vl = _getOrCreateVL('inventoryListContainer', {
                 rowHeight: 95,
                 renderRow: (entry, idx) => {
-                    const rowNum = totalScans - idx;
-                    const timeStr = entry.timestamp
+                    const rowNum     = filtered.length - idx;
+                    const timeStr    = entry.timestamp
                         ? new Date(entry.timestamp).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
-                    const currentQty = invMap.get(entry.itemCode)?.qty ?? 0;
+                    const entryQty = 1;  // كل مسحة = 1
+                    const rowQtyDisplay = entry.qty ?? 1;  // الكمية المعدّلة لهذا السجل
                     const nameEsc    = escapeHtml(entry.name).replace(/'/g,"\\'");
                     const bcEsc      = (entry.barcode||'').replace(/'/g,"\\'");
                     return `<div id="scanrow-${entry.id}" style="border-radius:14px;margin-bottom:9px;overflow:hidden;background:var(--surface2);box-shadow:0 4px 14px rgba(0,0,0,0.22);">
                         <div style="display:flex;align-items:center;gap:9px;padding:11px 12px 8px;">
-                            <div style="min-width:26px;height:26px;border-radius:7px;flex-shrink:0;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.08));border:1px solid rgba(6,182,212,0.22);display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:900;color:var(--accent);">${rowNum}</div>
+                            <div style="min-width:26px;height:26px;border-radius:7px;flex-shrink:0;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(14,165,233,0.08));border:1px solid rgba(6,182,212,0.22);display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:900;color:var(--accent);">${rowQtyDisplay}</div>
                             <div style="flex:1;min-width:0;">
                                 <div style="font-size:0.84rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(entry.name)}</div>
                                 <div style="font-size:0.62rem;color:var(--text-muted);margin-top:2px;display:flex;gap:6px;align-items:center;">
@@ -2609,7 +2654,7 @@
                         <div style="display:flex;gap:0;border-top:1px solid rgba(255,255,255,0.05);">
                             <button onclick="window.logRowAction('minus','${entry.itemCode}',${entry.id},'${nameEsc}','${bcEsc}')" style="flex:1;border:none;padding:9px 4px;cursor:pointer;font-family:'Cairo',sans-serif;background:linear-gradient(145deg,#2a0d0d,#190707);color:#ff6b6b;font-size:0.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;border-left:1px solid rgba(255,255,255,0.04);">
                                 <i class="fas fa-minus" style="font-size:0.62rem;"></i>${t('btnMinus')}</button>
-                            <button onclick="window.logRowAction('edit','${entry.itemCode}',${entry.id},'${nameEsc}','${bcEsc}',${currentQty})" style="flex:1.3;border:none;padding:9px 4px;cursor:pointer;font-family:'Cairo',sans-serif;background:linear-gradient(145deg,#1a1d28,#111420);color:#94a3b8;font-size:0.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;border-left:1px solid rgba(255,255,255,0.04);">
+                            <button onclick="window.logRowAction('edit','${entry.itemCode}',${entry.id},'${nameEsc}','${bcEsc}',${entryQty})" style="flex:1.3;border:none;padding:9px 4px;cursor:pointer;font-family:'Cairo',sans-serif;background:linear-gradient(145deg,#1a1d28,#111420);color:#94a3b8;font-size:0.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;border-left:1px solid rgba(255,255,255,0.04);">
                                 <i class="fas fa-pen" style="font-size:0.6rem;"></i>${t('btnEdit')}</button>
                             <button onclick="window.logRowAction('plus','${entry.itemCode}',${entry.id},'${nameEsc}','${bcEsc}')" style="flex:1;border:none;padding:9px 4px;cursor:pointer;font-family:'Cairo',sans-serif;background:linear-gradient(145deg,#0c2a1d,#071410);color:#06b6d4;font-size:0.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;border-left:1px solid rgba(255,255,255,0.04);">
                                 <i class="fas fa-plus" style="font-size:0.62rem;"></i>${t('btnPlus')}</button>
@@ -2618,7 +2663,7 @@
                         </div></div>`;
                 }
             });
-            vl.setItems(scanLog);
+            vl.setItems(filtered);
         }
 
         // ── تبويب الجرد ──
@@ -2900,6 +2945,11 @@
     }
 
     // ── أزرار السجل التفصيلي ──
+    window.filterScanLog = function(q) {
+        if (_vl['inventoryListContainer']) { _vl['inventoryListContainer'].destroy(); delete _vl['inventoryListContainer']; }
+        _renderTab('tab-scan');
+    };
+
     window.logRowAction = async function(action, itemCode, logId, name, barcode, currentQty) {
 
         // ── زيادة: أضف سطر جديد في scanLog + زد 1 في inventory ──
@@ -2981,43 +3031,39 @@
 
         // ── تعديل الكمية مباشرة ──
         if (action === 'edit') {
+            // اجلب السجل لمعرفة كميته الحالية (1 افتراضياً)
+            const logEntry = await new Promise(r => {
+                const tx = db.transaction("scanLog", "readonly");
+                tx.objectStore("scanLog").get(logId).onsuccess = e => r(e.target.result);
+            });
+            const oldQty = logEntry?.qty ?? 1;
             customPrompt(
                 t('enterNewQty'),
-                t('currentQty') + ': ' + currentQty,
-                currentQty,
+                t('currentQty') + ': ' + oldQty,
+                oldQty,
                 async (newQtyStr) => {
                     const newQty = parseInt(newQtyStr);
-                    if (isNaN(newQty) || newQty < 0) { showToast(t('invalidQty'), true); return; }
-                    const diff = newQty - currentQty;
+                    if (isNaN(newQty) || newQty < 1) { showToast(t('invalidQty'), true); return; }
+                    const diff = newQty - oldQty;
                     if (diff === 0) return;
                     const now = Date.now();
-                    if (diff > 0) {
-                        await new Promise(r => {
-                            const tx = db.transaction("scanLog", "readwrite");
-                            for (let i = 0; i < diff; i++)
-                                tx.objectStore("scanLog").add({ itemCode, name, barcode: barcode||'', timestamp: now + i });
+                    // حدّث كمية هذا السجل بالذات
+                    await new Promise(r => {
+                        const tx = db.transaction("scanLog", "readwrite");
+                        const store = tx.objectStore("scanLog");
+                        store.get(logId).onsuccess = e => {
+                            const rec = e.target.result;
+                            if (rec) { rec.qty = newQty; store.put(rec); }
                             tx.oncomplete = r;
-                        });
-                    } else {
-                        const allLogs = await new Promise(r => {
-                            const tx = db.transaction("scanLog", "readonly");
-                            tx.objectStore("scanLog").getAll().onsuccess = e => r(e.target.result);
-                        });
-                        const toDelete = allLogs.filter(l => l.itemCode === itemCode)
-                            .sort((a,b) => b.timestamp - a.timestamp)
-                            .slice(0, Math.abs(diff));
-                        await new Promise(r => {
-                            const tx = db.transaction("scanLog", "readwrite");
-                            toDelete.forEach(l => tx.objectStore("scanLog").delete(l.id));
-                            tx.oncomplete = r;
-                        });
-                    }
+                        };
+                    });
+                    // طبّق الفرق على inventory
                     await new Promise(r => {
                         const tx = db.transaction("inventory", "readwrite");
                         const store = tx.objectStore("inventory");
                         store.get(itemCode).onsuccess = e => {
                             const item = e.target.result;
-                            if (item) { item.qty = Math.max(0, newQty); item.timestamp = now; store.put(item); }
+                            if (item) { item.qty = Math.max(0, item.qty + diff); item.timestamp = now; store.put(item); }
                             tx.oncomplete = r;
                         };
                     });
@@ -3709,6 +3755,7 @@
             closeCamera: 'إغلاق الكاميرا',
             clearInventory: 'مسح الجرد',
             detailedLog: 'سجل المسحات التفصيلي',
+            searchScanLog: '🔍 ابحث في السجل...',
             importInventoryTitle: 'استيراد الجرد من Excel',
             chooseExcelFile: 'اختر ملف Excel للجرد',
             update: 'تحديث',
@@ -3944,6 +3991,7 @@
             closeCamera: 'Close Camera',
             clearInventory: 'Clear Inventory',
             detailedLog: 'Detailed Scan Log',
+            searchScanLog: '🔍 Search scan log...',
             importInventoryTitle: 'Import Inventory from Excel',
             chooseExcelFile: 'Choose Excel file for inventory',
             update: 'Replace',
@@ -4232,8 +4280,17 @@ async function rebuildPricesIndex() {
         const tx = db.transaction('stock', 'readonly');
         tx.objectStore('stock').getAll().onsuccess = e => r(e.target.result);
     });
-    const stockMap = {};
-    stockArr.forEach(s => { stockMap[s.key] = s.qty; });
+
+    // بناء خريطة المرجع: key -> qty
+    const stockQtyMap  = {};
+    const stockNameMap = {};
+    stockArr.forEach(s => {
+        stockQtyMap[s.key]  = s.qty;
+        stockNameMap[s.key] = s.name || s.key;
+    });
+
+    // مجموعة كل مفاتيح المرجع التي تمت مطابقتها مع منتج
+    const matchedStockKeys = new Set();
 
     prods.forEach(p => {
         const code = p.item_no || p.barcode;
@@ -4242,30 +4299,29 @@ async function rebuildPricesIndex() {
         const orig = parseFloat(p.price_orig) || 0;
         const sale = parseFloat(p.price_sale) || orig;
         const disc = orig > 0 ? Math.round((orig - sale) / orig * 100) : 0;
-        const stk  = stockMap[p.item_no] !== undefined ? stockMap[p.item_no]
-                   : stockMap[p.barcode] !== undefined ? stockMap[p.barcode] : 0;
-        const idx  = PR_LIST.length;
+
+        // ابحث عن الرصيد بأكثر من طريقة
+        let stk = 0;
+        if (p.item_no  !== undefined && stockQtyMap[p.item_no]  !== undefined) { stk = stockQtyMap[p.item_no];  matchedStockKeys.add(p.item_no); }
+        if (p.barcode  !== undefined && stockQtyMap[p.barcode]  !== undefined) { stk = stockQtyMap[p.barcode]; matchedStockKeys.add(p.barcode); }
+
+        const idx = PR_LIST.length;
         PR_LIST.push([code, name, orig, sale, disc, stk, p.item_no||'', p.barcode||'']);
-        if (p.item_no)  PR_CODE_MAP[p.item_no]    = idx;
-        if (p.barcode)  PR_CODE_MAP[p.barcode]     = idx;
-        if (p.barcode)  PR_BARCODE_MAP[p.barcode]  = idx;
-        if (p.item_no && p.barcode && p.item_no !== p.barcode)
-            PR_BARCODE_MAP[p.barcode] = idx;
+        if (p.item_no) { PR_CODE_MAP[p.item_no]   = idx; matchedStockKeys.add(p.item_no); }
+        if (p.barcode) { PR_CODE_MAP[p.barcode]   = idx; PR_BARCODE_MAP[p.barcode] = idx; matchedStockKeys.add(p.barcode); }
     });
 
-    // أضف منتجات المرجع غير الموجودة في products
-    const inProds = new Set([
-        ...prods.map(p => p.item_no).filter(Boolean),
-        ...prods.map(p => p.barcode).filter(Boolean),
-    ]);
+    // أضف كل أصناف المرجع التي لم تُطابَق مع أي منتج
     stockArr.forEach(s => {
-        if (inProds.has(s.key)) return; // موجود بالفعل
-        const code = s.key;
-        const name = s.name || code;
-        const idx  = PR_LIST.length;
-        PR_LIST.push([code, name, 0, 0, 0, s.qty, /[^0-9]/.test(code) ? code : '', /^\d+$/.test(code) ? code : '']);
-        PR_CODE_MAP[code]    = idx;
-        if (/^\d+$/.test(code)) PR_BARCODE_MAP[code] = idx;
+        if (matchedStockKeys.has(s.key)) return;
+        const code  = s.key;
+        const name  = s.name || code;
+        const isDash   = /[^0-9]/.test(code);   // يحتوي شرطة → رقم صنف
+        const isDigits = /^\d+$/.test(code);     // أرقام فقط → باركود
+        const idx   = PR_LIST.length;
+        PR_LIST.push([code, name, 0, 0, 0, s.qty, isDash ? code : '', isDigits ? code : '']);
+        PR_CODE_MAP[code] = idx;
+        if (isDigits) PR_BARCODE_MAP[code] = idx;
     });
 }
 
@@ -4339,7 +4395,11 @@ async function doPriceSearch() {
         const ql    = q.toLowerCase();
         const exact = PR_CODE_MAP[q];
         if (exact !== undefined) { area.innerHTML = renderPriceProduct(PR_LIST[exact]); return; }
-        const results = PR_LIST.filter(p => p[0].toLowerCase().includes(ql)).slice(0, 20);
+        const results = PR_LIST.filter(p =>
+            p[0].toLowerCase().includes(ql) ||
+            (p[6] && p[6].toLowerCase().includes(ql)) ||
+            (p[7] && p[7].toLowerCase().includes(ql))
+        ).slice(0, 20);
         area.innerHTML = renderPriceResultList(results, `${t('pricesNoResults')} "${q}"`);
     } else {
         const ql      = q.toLowerCase();
@@ -4483,12 +4543,15 @@ function showPriceDetail(code) {
     document.getElementById('prices-result-area').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function filterPricesList() {
-    const q = (document.getElementById('prices-list-search').value || '').toLowerCase().trim();
+function filterPricesList(q) {
+    q = (q || '').toLowerCase().trim();
     pricesListPage = 0;
     pricesFilteredList = q
-        ? PR_LIST.filter(p => p[1].toLowerCase().includes(q) || p[0].toLowerCase().includes(q) ||
-            Object.entries(PR_BARCODE_MAP).some(([b, i]) => i === PR_CODE_MAP[p[0]] && b.toLowerCase().includes(q)))
+        ? PR_LIST.filter(p =>
+            p[1].toLowerCase().includes(q) ||
+            p[0].toLowerCase().includes(q) ||
+            (p[6] && p[6].toLowerCase().includes(q)) ||
+            (p[7] && p[7].toLowerCase().includes(q)))
         : PR_LIST.slice();
     renderPricesList(pricesFilteredList);
 }
