@@ -2349,6 +2349,37 @@
     };
 
     // ── كاميرا محسّنة ──
+    // ═══════════════════════════════════════════════════════════════════════
+    // [تعديل رئيسي / السبب الجذري للمشكلة على آيفون]
+    // كانت هذه الدالة تعتمد على محرك القراءة الداخلي لمكتبة html5-qrcode عبر
+    // html5QrScanner.start(). تلك المكتبة تستخدم BarcodeDetector الأصلي فقط إن
+    // كان مدعوماً في المتصفح (Chrome/Android)، وإلا فهي تتراجع تلقائياً إلى
+    // محركها الداخلي (jsQR) وهذا المحرك **لا يفك تشفير سوى رموز QR فقط** ولا
+    // يدعم الباركود الخطي (Code128/EAN/UPC/...) إطلاقاً. ولأن Safari على
+    // iPhone لا يدعم BarcodeDetector أصلاً، كانت النتيجة: QR يعمل، والباركود
+    // الخطي لا يُقرأ أبداً — وهو بالضبط ما تم وصفه في المشكلة.
+    // الحل: تم استبدال محرك القراءة فقط بمحرك مخصّص يعمل مباشرة فوق
+    // getUserMedia: يستخدم BarcodeDetector الأصلي إن توفر (أداء أعلى على
+    // أندرويد)، ويتحول تلقائياً وبشفافية إلى ZXing-Browser (المكتبة محمّلة
+    // أصلاً في الصفحة) عند عدم توفره — وZXing يدعم كل صيغ الباركود الخطي على
+    // كل المتصفحات بما فيها Safari/iOS. تم الإبقاء على نفس أسماء الدوال
+    // (listCameras, startCamera, closeCamera, switchCamera) ونفس المتغيرات
+    // (html5QrScanner, scanningActive, availableCameras, currentCameraId)
+    // ونفس عناصر الواجهة (reader2, cameraDiv, scanLine, cameraSelect) بحيث
+    // لا يحتاج أي كود آخر في المشروع لأي تعديل.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // [تعديل] كشف أجهزة آيفون/آيباد لضبط معدل الفحص (fps) المناسب لها وتفادي
+    // إرهاق المعالج أو ارتفاع حرارة الجهاز أثناء المسح المستمر
+    const _isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    let _mainDetector    = null;  // BarcodeDetector الأصلي إن كان مدعوماً في المتصفح
+    let _mainStream      = null;  // MediaStream الحالي الخاص بكاميرا المسح الرئيسية
+    let _mainAnimFrame   = null;  // مُعرّف requestAnimationFrame لحلقة الفحص
+    let _mainZxingReader = null;  // قارئ ZXing المستخدم عند اللجوء لل fallback
+    let _mainLastScanTs  = 0;     // لضبط معدل الفحص (throttle) بديلاً عن fps المكتبة القديمة
+
     async function listCameras() {
         try {
             const devices = await Html5Qrcode.getCameras();
@@ -2367,9 +2398,9 @@
                 let selectedCam = savedCamId
                     ? devices.find(d => d.id === savedCamId)
                     : null;
-                // الأولوية: كاميرا خلفية رئيسية (وليست Ultra Wide/Front)، ثم أي خلفية، ثم الأخيرة
+                // الأولوية: الكاميرا رقم 3 (index 2)، ثم الخلفية، ثم الأخيرة
                 if (!selectedCam) {
-                    selectedCam = devices.find(d => /back|rear|خلفية|environment/i.test(d.label) && !/ultra|wide|front|selfie|أمامية/i.test(d.label))
+                    selectedCam = devices[2]   // كاميرا 3
                         || devices.find(d => /back|rear|خلفية|environment/i.test(d.label))
                         || devices[devices.length - 1];
                 }
@@ -2384,6 +2415,54 @@
         } catch (err) { console.warn(err); }
     }
 
+    // [تعديل] إنشاء عنصر <video> يدوياً داخل #reader2 بدلاً من ترك html5-qrcode
+    // ينشئه، مع ضبط playsinline/muted/autoplay وهي خصائص إلزامية لتشغيل
+    // الكاميرا مباشرة (inline) داخل Safari على iPhone دون ملء الشاشة إجبارياً
+    function _mainCreateVideoEl() {
+        const reader = document.getElementById('reader2');
+        reader.innerHTML = '';
+        const video = document.createElement('video');
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        video.setAttribute('autoplay', 'true');
+        video.muted = true;
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'cover';
+        reader.appendChild(video);
+        return video;
+    }
+
+    // [تعديل] بناء قيود فيديو عالية الجودة (أعلى إعدادات مناسبة للكاميرا
+    // الخلفية) مع محاولة تفعيل التركيز التلقائي المستمر (continuous
+    // autofocus) عبر advanced constraints — يدعمها Chrome/Android بشكل مباشر،
+    // وSafari يتجاهلها بأمان دون رمي خطأ إن لم تكن مدعومة
+    function _mainBuildConstraints(targetId, highRes) {
+        const base = targetId
+            ? { deviceId: { exact: targetId } }
+            : { facingMode: { ideal: 'environment' } };
+        return {
+            video: Object.assign({}, base, {
+                width:  { ideal: highRes ? 1920 : 1280 },
+                height: { ideal: highRes ? 1080 : 720 },
+                frameRate: { ideal: 30 },
+                advanced: [{ focusMode: 'continuous' }]
+            })
+        };
+    }
+
+    // [تعديل] معالج موحّد لأي كود يُقرأ من أي محرك (BarcodeDetector أو ZXing)
+    // يحافظ على نفس السلوك الأصلي تماماً: تمرير القيمة إلى onCameraScan()
+    // وعرضها في حقل الإدخال للمراجعة
+    function handleMainDecode(decoded) {
+        onCameraScan(decoded);
+        const code = sanitizeBarcode(decoded);
+        if (code) {
+            const input = document.getElementById('barcodeInput');
+            if (input) input.value = code;
+        }
+    }
+
     async function startCamera(cameraId = null) {
         if (html5QrScanner) { await html5QrScanner.stop().catch(() => {}); html5QrScanner = null; }
         scanningActive = false;
@@ -2393,52 +2472,119 @@
         setScanStatus('scanning', t('scanStatusStarting'));
         try {
             const targetId = cameraId || currentCameraId || (availableCameras[0]?.id);
-            if (!targetId) throw new Error("لا توجد كاميرا متاحة");
-            html5QrScanner = new Html5Qrcode("reader2");
-            const qrConfig = {
-                fps: 15,
-                disableFlip: false,
-                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-                // منطقة مسح مركّزة (مستطيل عريض) — تزيد دقة القراءة كثيراً على آيفون
-                // لأن سفاري لا يملك BarcodeDetector المدمج ويعتمد على محرك JS أبطأ وأقل دقة
-                qrbox: (viewfinderWidth, viewfinderHeight) => {
-                    const w = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.9);
-                    const h = Math.floor(w * 0.45);
-                    return { width: w, height: h };
-                },
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats?.EAN_13,
-                    Html5QrcodeSupportedFormats?.EAN_8,
-                    Html5QrcodeSupportedFormats?.UPC_A,
-                    Html5QrcodeSupportedFormats?.UPC_E,
-                    Html5QrcodeSupportedFormats?.CODE_128,
-                    Html5QrcodeSupportedFormats?.CODE_39,
-                    Html5QrcodeSupportedFormats?.CODE_93,
-                    Html5QrcodeSupportedFormats?.ITF,
-                    Html5QrcodeSupportedFormats?.CODABAR,
-                ].filter(Boolean)
-            };
-            const qrSuccess = async (decoded) => {
-                onCameraScan(decoded);
-                // عرض الكود المقروء في الحقل للمراجعة
-                const code = sanitizeBarcode(decoded);
-                if (code) document.getElementById('barcodeInput').value = code;
-            };
-            const qrError = () => {}; // خطأ مسح عادي، تجاهل
+
+            const video = _mainCreateVideoEl();
+
+            // [تعديل] محاولة الحصول على أعلى جودة ممكنة، ثم التراجع تدريجياً
+            // إلى قيود أبسط إن رفض المتصفح (بعض إصدارات Safari ترفض الجمع بين
+            // deviceId:exact وadvanced constraints معاً)
             try {
-                // المحاولة الأولى: الكاميرا المحددة بالضبط (تعمل غالباً على أندرويد)
-                await html5QrScanner.start({ deviceId: { exact: targetId } }, qrConfig, qrSuccess, qrError);
-            } catch (exactErr) {
-                // فشل الاختيار الدقيق (شائع على آيفون/سفاري) — نجرب الكاميرا الخلفية بشكل عام
-                console.warn('exact deviceId failed, falling back to facingMode:', exactErr);
-                await html5QrScanner.start({ facingMode: { ideal: 'environment' } }, qrConfig, qrSuccess, qrError);
+                _mainStream = await navigator.mediaDevices.getUserMedia(_mainBuildConstraints(targetId, true));
+            } catch (e1) {
+                try {
+                    _mainStream = await navigator.mediaDevices.getUserMedia(_mainBuildConstraints(targetId, false));
+                } catch (e2) {
+                    const fallback = targetId
+                        ? { video: { deviceId: { exact: targetId } } }
+                        : { video: { facingMode: 'environment' } };
+                    _mainStream = await navigator.mediaDevices.getUserMedia(fallback);
+                }
             }
+
+            video.srcObject = _mainStream;
+            await video.play();
+
+            // [تعديل] اختيار محرك القراءة تلقائياً: BarcodeDetector الأصلي إن
+            // وُجد (Android/Chrome)، وإلا يبقى null ليتم تفعيل ZXing كـ fallback
+            if ('BarcodeDetector' in window) {
+                try {
+                    _mainDetector = new BarcodeDetector({
+                        formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','codabar']
+                    });
+                } catch (e) { _mainDetector = null; }
+            } else {
+                _mainDetector = null;
+            }
+
+            // [تعديل] تجهيز قارئ ZXing كمحرك بديل فوري عندما لا يدعم المتصفح
+            // BarcodeDetector (هذا هو الوضع الفعلي على كل إصدارات Safari حالياً)
+            _mainZxingReader = null;
+            if (!_mainDetector && window.ZXing) {
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+                    ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+                    ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+                    ZXing.BarcodeFormat.CODE_93, ZXing.BarcodeFormat.ITF,
+                    ZXing.BarcodeFormat.CODABAR
+                ]);
+                hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                _mainZxingReader = new ZXing.MultiFormatReader();
+                _mainZxingReader.setHints(hints);
+            }
+
             scanningActive = true;
-            currentCameraId = targetId;
+            currentCameraId = targetId || currentCameraId;
             if (scanLine) scanLine.style.display = 'block';
             document.getElementById('closeCamBtn').style.display = 'flex';
             setScanStatus('ready', t('cameraActive'));
             initAudio();
+
+            // [تعديل] واجهة stop() موحّدة متوافقة تماماً مع كل استدعاءات
+            // html5QrScanner.stop().catch(()=>{}) الموجودة في بقية الملف، دون
+            // الحاجة لتعديلها
+            html5QrScanner = {
+                stop: async () => {
+                    scanningActive = false;
+                    if (_mainAnimFrame) { cancelAnimationFrame(_mainAnimFrame); _mainAnimFrame = null; }
+                    if (_mainStream) { _mainStream.getTracks().forEach(tr => tr.stop()); _mainStream = null; }
+                    _mainDetector = null;
+                    _mainZxingReader = null;
+                    const r = document.getElementById('reader2');
+                    if (r) r.innerHTML = '';
+                }
+            };
+
+            // [تعديل] حلقة الفحص: منطقة مسح مركزية أفقية (بديل خاصية qrbox في
+            // html5-qrcode) تقتصر على 55% من ارتفاع الإطار لتحسين سرعة ودقة
+            // قراءة الباركود الخطي، مع تقليل معدل الفحص على آيفون تحديداً
+            // (نقطة 7: fps مناسب لأجهزة iPhone) لتفادي إرهاق المعالج
+            const minInterval = _isIOSDevice ? 70 : 33; // ~14fps على آيفون، ~30fps على أندرويد
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+            async function scanLoop(ts) {
+                if (!scanningActive) return;
+                if (!_mainLastScanTs || ts - _mainLastScanTs >= minInterval) {
+                    _mainLastScanTs = ts;
+                    if (video.readyState >= video.HAVE_ENOUGH_DATA && video.videoWidth) {
+                        const vw = video.videoWidth, vh = video.videoHeight;
+                        const rh = Math.max(120, Math.floor(vh * 0.55));
+                        const ry = Math.floor((vh - rh) / 2);
+                        canvas.width  = vw;
+                        canvas.height = rh;
+                        ctx.drawImage(video, 0, ry, vw, rh, 0, 0, vw, rh);
+
+                        if (_mainDetector) {
+                            try {
+                                const barcodes = await _mainDetector.detect(canvas);
+                                if (barcodes.length > 0) handleMainDecode(barcodes[0].rawValue);
+                            } catch (e) {}
+                        } else if (_mainZxingReader) {
+                            try {
+                                const imgData   = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
+                                const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+                                const result    = _mainZxingReader.decode(bitmap);
+                                if (result) handleMainDecode(result.getText());
+                            } catch (e) {}
+                        }
+                    }
+                }
+                _mainAnimFrame = requestAnimationFrame(scanLoop);
+            }
+            _mainAnimFrame = requestAnimationFrame(scanLoop);
+
         } catch (err) {
             showToast(t('cameraError') + err.message, true);
             cameraDiv.classList.add('hidden');
@@ -4626,8 +4772,10 @@ async function psLoadCameraList() {
             opt.textContent = cam.label;
             sel.appendChild(opt);
         });
-        // اختيار الكاميرا الخلفية الرئيسية تلقائياً (تفادي Ultra Wide/الأمامية)
-        const preferred = _psCameras.find(c => /back|rear/i.test(c.label) && !/ultra|wide|front|selfie/i.test(c.label))
+        // اختيار الكاميرا الخلفية تلقائياً (camera 3 أو back/rear)
+        const preferred = _psCameras.find(c => /camera\s*3/i.test(c.label))
+            || _psCameras.find(c => /\b3\b.*back|back.*\b3\b/i.test(c.label))
+            || _psCameras[3]
             || _psCameras.find(c => /back|rear/i.test(c.label))
             || _psCameras[_psCameras.length - 1];
         sel.value = preferred.id;
@@ -4662,23 +4810,24 @@ async function psStartScanner() {
     if (line) line.style.display = 'block';
 
     const camId = _psSelectedCam || (_psCameras.length ? _psCameras[_psCameras.length - 1].id : null);
-    const constraints = camId
-        ? { video: { deviceId: { exact: camId }, width: { ideal: 1920 }, height: { ideal: 1080 } } }
-        : { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } };
-    const fallbackConstraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } };
+    // [تعديل] رفع جودة الفيديو المطلوبة (أعلى إعدادات مناسبة للكاميرا الخلفية)
+    // مع محاولة تفعيل التركيز التلقائي المستمر، ثم التراجع تدريجياً إلى قيود
+    // أبسط إن رفضها المتصفح — بعض إصدارات Safari ترفض advanced constraints
+    // مجتمعة مع deviceId:exact
+    const highConstraints = camId
+        ? { video: { deviceId: { exact: camId }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] } }
+        : { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] } };
+    const lowConstraints = camId
+        ? { video: { deviceId: { exact: camId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
+        : { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
 
     try {
         try {
-            _psStream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (exactErr) {
-            // فشل تحديد الكاميرا بدقة (شائع على آيفون/سفاري) — جرّب الكاميرا الخلفية بشكل عام
-            console.warn('ps: exact deviceId failed, falling back to facingMode:', exactErr);
-            _psStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+            _psStream = await navigator.mediaDevices.getUserMedia(highConstraints);
+        } catch (eHigh) {
+            _psStream = await navigator.mediaDevices.getUserMedia(lowConstraints);
         }
         video.srcObject = _psStream;
-        video.muted = true;
-        video.setAttribute('playsinline', 'true');
-        video.setAttribute('webkit-playsinline', 'true');
         await video.play();
     } catch (e) {
         psStopScanner();
@@ -4702,17 +4851,24 @@ async function psStartScanner() {
     btn.disabled = false;
 
     // حلقة المسح بـ BarcodeDetector
-    async function psScanLoop() {
+    // [تعديل] تقليل معدل الفحص على آيفون فقط (fps مناسب لأجهزة iPhone) لتفادي
+    // إرهاق المعالج، مع الإبقاء على السرعة الكاملة على أندرويد
+    const _psMinInterval = (typeof _isIOSDevice !== 'undefined' && _isIOSDevice) ? 70 : 0;
+    let _psLastScanTs = 0;
+    async function psScanLoop(ts) {
         if (!_psScanning) return;
-        if (_psDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
-            try {
-                const barcodes = await _psDetector.detect(video);
-                if (barcodes.length > 0 && !_psCooldown) {
-                    _psCooldown = true;
-                    psOnBarcodeFound(barcodes[0].rawValue);
-                    setTimeout(() => { _psCooldown = false; }, 1500);
-                }
-            } catch (e) {}
+        if (!_psMinInterval || !_psLastScanTs || ts - _psLastScanTs >= _psMinInterval) {
+            _psLastScanTs = ts;
+            if (_psDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
+                try {
+                    const barcodes = await _psDetector.detect(video);
+                    if (barcodes.length > 0 && !_psCooldown) {
+                        _psCooldown = true;
+                        psOnBarcodeFound(barcodes[0].rawValue);
+                        setTimeout(() => { _psCooldown = false; }, 1500);
+                    }
+                } catch (e) {}
+            }
         }
         _psAnimFrame = requestAnimationFrame(psScanLoop);
     }
@@ -4753,24 +4909,27 @@ function psStartZxingLoop(video) {
         ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
         ZXing.BarcodeFormat.QR_CODE
     ];
+    // [تعديل] TRY_HARDER يحسّن الدقة مع الباركود الخطي متوسط الجودة/الإضاءة
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true); // يحسّن الدقة كثيراً على آيفون (بديل عن BarcodeDetector الأصلي)
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
     _psZxingReader = new ZXing.MultiFormatReader();
     _psZxingReader.setHints(hints);
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    function zLoop() {
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    // [تعديل] نفس مبدأ تقليل معدل الفحص على آيفون المستخدم في المحرك الرئيسي
+    const _zxMinInterval = (typeof _isIOSDevice !== 'undefined' && _isIOSDevice) ? 70 : 0;
+    let _zxLastScanTs = 0;
+    function zLoop(ts) {
         if (!_psScanning) return;
-        if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth) {
-            // قصّ منطقة مركزية عريضة بدل الإطار كامل — يزيد الدقة والسرعة كثيراً
-            const vw = video.videoWidth, vh = video.videoHeight;
-            const cropW = Math.floor(vw * 0.85);
-            const cropH = Math.floor(vh * 0.4);
-            const sx = Math.floor((vw - cropW) / 2);
-            const sy = Math.floor((vh - cropH) / 2);
-            canvas.width  = cropW;
-            canvas.height = cropH;
-            ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cropW, cropH);
+        if (_zxMinInterval && _zxLastScanTs && ts - _zxLastScanTs < _zxMinInterval) {
+            _psAnimFrame = requestAnimationFrame(zLoop);
+            return;
+        }
+        _zxLastScanTs = ts;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width  = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
             try {
                 const imgData  = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
