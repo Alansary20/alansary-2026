@@ -4,16 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>نظام الجرد الذكي | ترتيب تنازلي وتأخير</title>
-    <!-- Use local libraries if available, otherwise fall back to CDN -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <!-- Local offline assets (no internet required) -->
+    <script src="libs/xlsx.full.min.js"></script>
+    <script src="libs/exceljs.min.js"></script>
+    <script src="libs/zxing.min.js"></script>
+    <link rel="stylesheet" href="fonts/css/all.min.css">
+    <link rel="stylesheet" href="fonts/local-fonts.css">
     <style>
         :root {
             --bg:          #0f0814;
@@ -1182,7 +1178,7 @@
             <!-- زر إغلاق الكاميرا — يظهر فوق الكاميرا حين تكون نشطة -->
             <!-- نافذة الكاميرا -->
             <div id="cameraDiv" class="camera-wrapper hidden" style="position:relative;">
-                <div id="reader2"></div>
+                <video id="reader2" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></video>
                 <!-- خط المسح المتحرك -->
                 <div id="scanLine" style="display:none; position:absolute; left:10%; right:10%; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); border-radius:2px; animation:scanAnim 1.8s ease-in-out infinite; top:50%; z-index:10; box-shadow:0 0 10px var(--accent);"></div>
             </div>
@@ -1578,6 +1574,7 @@
             <button id="processDbBtn" class="btn-primary"><span data-i18n="processProducts">معالجة ورفع المنتجات</span></button>
         </div>
         <button id="exportProductsBtn" class="btn-secondary"><i class="fas fa-file-excel"></i> <span data-i18n="exportProducts">تصدير المنتجات</span></button>
+        <button id="dedupeProductsBtn" class="btn-secondary" style="margin-top:8px;"><i class="fas fa-object-ungroup"></i> <span data-i18n="dedupeProducts">دمج المنتجات المكررة</span></button>
         <input type="text" id="searchProducts" class="search-input" placeholder="🔍 بحث..." autocomplete="off">
         <div id="productsTableContainer" class="data-wrapper"></div>
         <button id="clearProductsBtn" class="btn-secondary" style="margin-top:12px;"><span data-i18n="clearProducts">مسح كل المنتجات</span></button>
@@ -1623,6 +1620,7 @@
             <button id="saveProductBtn" style="background:linear-gradient(135deg,#0891b2,#06b6d4); color:#fff; border:none; padding:12px; border-radius:10px; flex:1; font-weight:800; font-family:'Cairo',sans-serif; cursor:pointer;" data-i18n="save">حفظ</button>
             <button id="closeModalBtn" style="background:var(--surface2); color:var(--text); border:none; padding:12px; border-radius:10px; flex:1; cursor:pointer; font-family:'Cairo',sans-serif;" data-i18n="cancel">إلغاء</button>
         </div>
+        <button id="deleteProductModalBtn" style="display:none;width:100%;margin-top:10px;background:rgba(220,38,38,0.1); color:#fb7185; border:1px solid rgba(220,38,38,0.2); padding:11px; border-radius:10px; cursor:pointer; font-family:'Cairo',sans-serif; font-weight:700;"><i class="fas fa-trash-alt"></i> <span data-i18n="deleteBtn">حذف</span></button>
     </div>
 </div>
 <script>
@@ -1720,7 +1718,6 @@
         });
     }
     let inventory = [];
-    let html5QrScanner = null;
     let scanningActive = false;
     let availableCameras = [];
     let currentCameraId = null;
@@ -1856,13 +1853,16 @@
     function escapeHtml(str) { return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
     let _uidCounter = 0;
     function generateUniqueId() { return Date.now() + '-' + (++_uidCounter) + '-' + Math.random().toString(36).substr(2, 5); }
+    // مطابقة الباركود الأساسي أو أي باركود إضافي مخزّن لنفس المنتج
+    function productMatchesBarcode(p, code) { return !!code && (p.barcode === code || (Array.isArray(p.altBarcodes) && p.altBarcodes.includes(code))); }
 
     // ══════════════════════════════════════════════
     //  Web Worker لقراءة Excel بدون تجميد الواجهة
     // ══════════════════════════════════════════════
     // نبني الـ worker كـ Blob inline — لا يحتاج ملف خارجي
+    const _xlsxLibAbsoluteUrl = new URL('libs/xlsx.full.min.js', window.location.href).href;
     const _xlsxWorkerSrc = `
-        importScripts('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+        importScripts('${_xlsxLibAbsoluteUrl}');
         self.onmessage = function(e) {
             try {
                 const wb = XLSX.read(new Uint8Array(e.data.buf), { type: 'array', cellDates: false });
@@ -1960,8 +1960,8 @@
                 { id: 'barcode', label: t('thBarcode'),  icon: 'fas fa-barcode',     color: 'var(--accent2)',    required: false, keywords: ['باركود','barcode','بار','كود'] },
                 { id: 'itemno',  label: t('thItemNo'),   icon: 'fas fa-hashtag',     color: 'var(--accent)',     required: false, keywords: ['رقم الصنف','رقم','item','صنف'] },
                 { id: 'name',    label: t('thName'),     icon: 'fas fa-tag',         color: 'var(--text-muted)', required: false, keywords: ['اسم','name','وصف','desc','المادة'] },
-                { id: 'price_orig', label: 'السعر الأساسي', icon: 'fas fa-money-bill', color: '#9ca3af', required: false, keywords: ['أصلي','original','سعر قبل','سعر أصلي','سعر1'] },
-                { id: 'price_sale', label: 'السعر بعد الخصم',   icon: 'fas fa-tags',       color: '#f59e0b', required: false, keywords: ['خصم','sale','بعد','صافي','net','سعر بعد','سعر2'] },
+                { id: 'price_orig', label: 'السعر الأساسي', icon: 'fas fa-money-bill', color: '#9ca3af', required: false, keywords: ['أساسي','السعر الأساسي','أصلي','السعر الأصلي','original','قبل الخصم','سعر قبل','سعر أصلي','سعر1'] },
+                { id: 'price_sale', label: 'السعر بعد الخصم',   icon: 'fas fa-tags',       color: '#f59e0b', required: false, keywords: ['بعد الخصم','السعر بعد الخصم','عرض','سعر العرض','خصم','sale','بعد','صافي','net','سعر بعد','سعر2'] },
             ],
             async function(colMap) {
                 if (colMap.barcode === null && colMap.itemno === null) { showToast(t('selectBarcodeOrItem'), true); return; }
@@ -1972,6 +1972,20 @@
                     const c2 = db.transaction("uploadedFiles","readwrite"); c2.objectStore("uploadedFiles").clear(); await new Promise(r=>{ c2.oncomplete=r; });
                 }
                 const sourceId = Date.now(); let totalAdded = 0;
+                // في وضع الدمج: اجلب كل المنتجات الموجودة وابنِ الخرائط مرة واحدة فقط لكامل عملية الرفع
+                // (بدل إعادة جلبها من القاعدة مع كل دفعة، وهذا كان يبطئ الرفع كثيراً مع الكتالوجات الكبيرة)
+                let byItemNo = new Map(), byBarcode = new Map();
+                if (dbUploadMode === 'merge') {
+                    const allExisting = await new Promise(r => {
+                        const rtx = db.transaction("products","readonly");
+                        rtx.objectStore("products").getAll().onsuccess = e => r(e.target.result);
+                    });
+                    for (const p of allExisting) {
+                        if (p.item_no) byItemNo.set(p.item_no, p);
+                        if (p.barcode) byBarcode.set(p.barcode, p);
+                        if (Array.isArray(p.altBarcodes)) for (const ab of p.altBarcodes) byBarcode.set(ab, p);
+                    }
+                }
                 for (let fi = 0; fi < pendingProductFiles.length; fi++) {
                     const file = pendingProductFiles[fi];
                     try {
@@ -1986,13 +2000,7 @@
                         const batch = dataRows.slice(start, Math.min(start + BATCH_SIZE, dataRows.length));
 
                         if (dbUploadMode === 'merge') {
-                            // في الدمج: ابحث عن كل منتج موجود بـ item_no أو barcode وحدّثه، وإلا أضف جديد
-                            const allExisting = await new Promise(r => {
-                                const rtx = db.transaction("products","readonly");
-                                rtx.objectStore("products").getAll().onsuccess = e => r(e.target.result);
-                            });
-                            const byItemNo  = new Map(allExisting.filter(p=>p.item_no).map(p=>[p.item_no, p]));
-                            const byBarcode = new Map(allExisting.filter(p=>p.barcode).map(p=>[p.barcode, p]));
+                            // في الدمج: استخدم الخرائط المبنية مسبقاً (مرة واحدة لكل الرفعة) بدل إعادة جلبها من القاعدة
 
                             const tx = db.transaction(["products"], "readwrite");
                             const store = tx.objectStore("products");
@@ -2006,12 +2014,28 @@
                                 if (!barcode && !itemno) continue;
                                 // ابحث عن الموجود
                                 const existing = (itemno && byItemNo.get(itemno)) || (barcode && byBarcode.get(barcode));
+                                let savedProduct;
                                 if (existing) {
-                                    // حدّث الموجود مع الحفاظ على id
-                                    store.put({ ...existing, barcode: barcode||existing.barcode, item_no: itemno||existing.item_no, name: name||existing.name, price_orig: price_orig||existing.price_orig, price_sale: price_sale||existing.price_sale });
+                                    // حدّث الموجود مع الحفاظ على id، وأضف الباركود الجديد كمعرّف إضافي إن كان مختلف
+                                    let altBarcodes = Array.isArray(existing.altBarcodes) ? existing.altBarcodes.slice() : [];
+                                    let mainBarcode = existing.barcode;
+                                    if (barcode && barcode !== existing.barcode) {
+                                        if (!mainBarcode) {
+                                            mainBarcode = barcode; // ما فيه باركود أساسي أصلاً، خله هو الأساسي
+                                        } else if (!altBarcodes.includes(barcode)) {
+                                            altBarcodes.push(barcode); // احتفظ بالقديم، أضف الجديد كإضافي
+                                        }
+                                    }
+                                    savedProduct = { ...existing, barcode: mainBarcode, altBarcodes, item_no: itemno||existing.item_no, name: name||existing.name, price_orig: existing.price_orig, price_sale: existing.price_sale };
+                                    store.put(savedProduct);
                                 } else {
-                                    store.add({ id: generateUniqueId(), barcode, item_no: itemno, name: name||t('noName'), price_orig, price_sale, sourceId }); totalAdded++;
+                                    savedProduct = { id: generateUniqueId(), barcode, item_no: itemno, name: name||t('noName'), price_orig, price_sale, sourceId };
+                                    store.add(savedProduct); totalAdded++;
                                 }
+                                // حدّث الخرائط بالذاكرة فوراً عشان الصفوف التالية بنفس الدفعة تلقى هذا التحديث بدل ما تنشئ تكرار
+                                if (savedProduct.item_no) byItemNo.set(savedProduct.item_no, savedProduct);
+                                if (savedProduct.barcode) byBarcode.set(savedProduct.barcode, savedProduct);
+                                if (Array.isArray(savedProduct.altBarcodes)) for (const ab of savedProduct.altBarcodes) byBarcode.set(ab, savedProduct);
                             }
                             await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
                         } else {
@@ -2053,7 +2077,8 @@
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
-                const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+                // نقرأ فقط أول 8 صفوف من الملف لعرض معاينة الأعمدة — بدل تحليل الملف كامل (كان يسبب بطء شديد مع الملفات الكبيرة)
+                const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', sheetRows: 8 });
                 const ws = wb.Sheets[wb.SheetNames[0]];
                 const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
                 const chk = document.getElementById('colMapNoHeader');
@@ -2138,7 +2163,7 @@
             pendingStockFiles.map(f => f.name).join(', '),
             pendingStockFiles[0],
             [
-                { id: 'itemno', label: t('thItemNo'),  icon: 'fas fa-hashtag',     color: 'var(--accent)',     required: true,  keywords: ['رقم الصنف','رقم','item','code','كود','صنف'] },
+                { id: 'itemno', label: t('thItemNo'),  icon: 'fas fa-hashtag',     color: 'var(--accent)',     required: true,  keywords: ['رقم الصنف','رقم','item','code','صنف'] },
                 { id: 'name',   label: t('thName'),    icon: 'fas fa-tag',         color: 'var(--text-muted)', required: false, keywords: ['اسم','name','وصف','desc','المادة'] },
                 { id: 'qty',    label: t('thQty'),     icon: 'fas fa-layer-group', color: 'var(--gold)',       required: true,  keywords: ['الفعلي','كمية','qty','quant','count','تحويل','النهائي'] },
             ],
@@ -2150,6 +2175,16 @@
                     const clearTx = db.transaction("stock", "readwrite");
                     clearTx.objectStore("stock").clear();
                     await new Promise(r => { clearTx.oncomplete = r; });
+                }
+                // في وضع الدمج: اجلب كل المرجع الموجود وابنِ خريطة مرة واحدة فقط لكامل عملية الرفع
+                // (بدل إعادة الجلب لكل دفعة بطريقة هشة كانت تسبب تعليق الرفع أحياناً)
+                let byKey = new Map();
+                if (mode === 'merge') {
+                    const allExisting = await new Promise(r => {
+                        const rtx = db.transaction("stock", "readonly");
+                        rtx.objectStore("stock").getAll().onsuccess = e => r(e.target.result);
+                    });
+                    for (const rec of allExisting) if (rec.key) byKey.set(rec.key, rec);
                 }
                 for (let fi = 0; fi < pendingStockFiles.length; fi++) {
                     const file = pendingStockFiles[fi];
@@ -2163,42 +2198,22 @@
                         const batch = dataRows.slice(start, start + 500);
                         const tx = db.transaction("stock", "readwrite");
                         const store = tx.objectStore("stock");
-                        if (mode === 'merge') {
-                            // في وضع الدمج: اقرأ الموجود مسبقاً في batch واحد
-                            const keys = batch.map(row => Array.isArray(row) ? String(row[colMap.itemno] ?? '').trim().replace(/\.0+$/, '') : '').filter(Boolean);
-                            const existingMap = await new Promise(r => {
-                                const rtx = db.transaction("stock", "readonly");
-                                const rstore = rtx.objectStore("stock");
-                                const results = {};
-                                let pending = keys.length;
-                                if (!pending) { r(results); return; }
-                                keys.forEach(k => {
-                                    rstore.get(k).onsuccess = e => {
-                                        if (e.target.result) results[k] = e.target.result;
-                                        if (--pending === 0) r(results);
-                                    };
-                                });
-                            });
-                            for (const row of batch) {
-                                if (!Array.isArray(row)) continue;
-                                const itemNo = String(row[colMap.itemno] ?? '').trim().replace(/\.0+$/, '');
-                                if (!itemNo) continue;
-                                const name = colMap.name !== null ? String(row[colMap.name] ?? '').trim() : '';
-                                const qty  = parseInt(row[colMap.qty]) || 0;
-                                const existing = existingMap[itemNo];
-                                store.put({ key: itemNo, name: name || existing?.name || '', qty: (existing ? existing.qty : 0) + qty });
-                            }
-                        } else {
-                            for (const row of batch) {
-                                if (!Array.isArray(row)) continue;
-                                const itemNo = String(row[colMap.itemno] ?? '').trim().replace(/\.0+$/, '');
-                                if (!itemNo) continue;
-                                const name = colMap.name !== null ? String(row[colMap.name] ?? '').trim() : '';
-                                const qty  = parseInt(row[colMap.qty]) || 0;
+                        for (const row of batch) {
+                            if (!Array.isArray(row)) continue;
+                            const itemNo = String(row[colMap.itemno] ?? '').trim().replace(/\.0+$/, '');
+                            if (!itemNo) continue;
+                            const name = colMap.name !== null ? String(row[colMap.name] ?? '').trim() : '';
+                            const qty  = parseInt(row[colMap.qty]) || 0;
+                            if (mode === 'merge') {
+                                const existing = byKey.get(itemNo);
+                                const record = { key: itemNo, name: name || existing?.name || '', qty: (existing ? existing.qty : 0) + qty };
+                                store.put(record);
+                                byKey.set(itemNo, record); // حدّث الخريطة فوراً لتفادي تكرار داخل نفس الرفعة
+                            } else {
                                 store.put({ key: itemNo, name, qty });
                             }
                         }
-                        await new Promise(r => { tx.oncomplete = r; });
+                        await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
                     }
                 }
                 hideProgress();
@@ -2273,9 +2288,9 @@
 
             // بحث حسب النوع أولاً ثم الكل
             let match = null;
-            if (isBarcode)      match = products.find(p => p.barcode  === cleanVal) || products.find(p => p.item_no === cleanVal);
-            else if (isItemNo)  match = products.find(p => p.item_no  === cleanVal) || products.find(p => p.barcode === cleanVal);
-            else                match = products.find(p => p.barcode  === cleanVal || p.item_no === cleanVal);
+            if (isBarcode)      match = products.find(p => productMatchesBarcode(p, cleanVal)) || products.find(p => p.item_no === cleanVal);
+            else if (isItemNo)  match = products.find(p => p.item_no  === cleanVal) || products.find(p => productMatchesBarcode(p, cleanVal));
+            else                match = products.find(p => productMatchesBarcode(p, cleanVal) || p.item_no === cleanVal);
 
             if (match) {
                 const matchKey = match.item_no || match.barcode;
@@ -2348,61 +2363,33 @@
         });
     };
 
-    // ── كاميرا محسّنة ──
-    // ═══════════════════════════════════════════════════════════════════════
-    // [تعديل رئيسي / السبب الجذري للمشكلة على آيفون]
-    // كانت هذه الدالة تعتمد على محرك القراءة الداخلي لمكتبة html5-qrcode عبر
-    // html5QrScanner.start(). تلك المكتبة تستخدم BarcodeDetector الأصلي فقط إن
-    // كان مدعوماً في المتصفح (Chrome/Android)، وإلا فهي تتراجع تلقائياً إلى
-    // محركها الداخلي (jsQR) وهذا المحرك **لا يفك تشفير سوى رموز QR فقط** ولا
-    // يدعم الباركود الخطي (Code128/EAN/UPC/...) إطلاقاً. ولأن Safari على
-    // iPhone لا يدعم BarcodeDetector أصلاً، كانت النتيجة: QR يعمل، والباركود
-    // الخطي لا يُقرأ أبداً — وهو بالضبط ما تم وصفه في المشكلة.
-    // الحل: تم استبدال محرك القراءة فقط بمحرك مخصّص يعمل مباشرة فوق
-    // getUserMedia: يستخدم BarcodeDetector الأصلي إن توفر (أداء أعلى على
-    // أندرويد)، ويتحول تلقائياً وبشفافية إلى ZXing-Browser (المكتبة محمّلة
-    // أصلاً في الصفحة) عند عدم توفره — وZXing يدعم كل صيغ الباركود الخطي على
-    // كل المتصفحات بما فيها Safari/iOS. تم الإبقاء على نفس أسماء الدوال
-    // (listCameras, startCamera, closeCamera, switchCamera) ونفس المتغيرات
-    // (html5QrScanner, scanningActive, availableCameras, currentCameraId)
-    // ونفس عناصر الواجهة (reader2, cameraDiv, scanLine, cameraSelect) بحيث
-    // لا يحتاج أي كود آخر في المشروع لأي تعديل.
-    // ═══════════════════════════════════════════════════════════════════════
-
-    // [تعديل] كشف أجهزة آيفون/آيباد لضبط معدل الفحص (fps) المناسب لها وتفادي
-    // إرهاق المعالج أو ارتفاع حرارة الجهاز أثناء المسح المستمر
-    const _isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-    let _mainDetector    = null;  // BarcodeDetector الأصلي إن كان مدعوماً في المتصفح
-    let _mainStream      = null;  // MediaStream الحالي الخاص بكاميرا المسح الرئيسية
-    let _mainAnimFrame   = null;  // مُعرّف requestAnimationFrame لحلقة الفحص
-    let _mainZxingReader = null;  // قارئ ZXing المستخدم عند اللجوء لل fallback
-    let _mainLastScanTs  = 0;     // لضبط معدل الفحص (throttle) بديلاً عن fps المكتبة القديمة
-
+    // ── كاميرا محسّنة (BarcodeDetector أولاً، وZXing احتياطي — نفس منطق تبويب الأسعار) ──
+    let _scanStream = null, _scanAnimFrame = null, _scanDetector = null, _scanZxingReader = null;
     async function listCameras() {
         try {
-            const devices = await Html5Qrcode.getCameras();
-            availableCameras = devices;
+            await navigator.mediaDevices.getUserMedia({ video: true })
+                .then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
+            const devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+            availableCameras = devices.map(d => ({ id: d.deviceId, label: d.label || '' }));
             const select = document.getElementById('cameraSelect');
             select.innerHTML = '<option value="">اختر الكاميرا</option>';
-            devices.forEach((device, idx) => {
+            availableCameras.forEach((device, idx) => {
                 const option = document.createElement('option');
                 option.value = device.id;
                 option.textContent = device.label || `كاميرا ${idx + 1}`;
                 select.appendChild(option);
             });
-            if (devices.length > 0) {
+            if (availableCameras.length > 0) {
                 // استعادة الكاميرا المحفوظة أولاً
                 const savedCamId = await loadSetting('invSelectedCamera', '');
                 let selectedCam = savedCamId
-                    ? devices.find(d => d.id === savedCamId)
+                    ? availableCameras.find(d => d.id === savedCamId)
                     : null;
                 // الأولوية: الكاميرا رقم 3 (index 2)، ثم الخلفية، ثم الأخيرة
                 if (!selectedCam) {
-                    selectedCam = devices[2]   // كاميرا 3
-                        || devices.find(d => /back|rear|خلفية|environment/i.test(d.label))
-                        || devices[devices.length - 1];
+                    selectedCam = availableCameras[2]   // كاميرا 3
+                        || availableCameras.find(d => /back|rear|خلفية|environment/i.test(d.label))
+                        || availableCameras[availableCameras.length - 1];
                 }
                 currentCameraId = selectedCam.id;
                 select.value = currentCameraId;
@@ -2415,176 +2402,55 @@
         } catch (err) { console.warn(err); }
     }
 
-    // [تعديل] إنشاء عنصر <video> يدوياً داخل #reader2 بدلاً من ترك html5-qrcode
-    // ينشئه، مع ضبط playsinline/muted/autoplay وهي خصائص إلزامية لتشغيل
-    // الكاميرا مباشرة (inline) داخل Safari على iPhone دون ملء الشاشة إجبارياً
-    function _mainCreateVideoEl() {
-        const reader = document.getElementById('reader2');
-        reader.innerHTML = '';
-        const video = document.createElement('video');
-        video.setAttribute('playsinline', 'true');
-        video.setAttribute('webkit-playsinline', 'true');
-        video.setAttribute('autoplay', 'true');
-        video.muted = true;
-        video.style.width = '100%';
-        video.style.height = '100%';
-        video.style.objectFit = 'cover';
-        reader.appendChild(video);
-        return video;
-    }
-
-    // [تعديل] بناء قيود فيديو عالية الجودة (أعلى إعدادات مناسبة للكاميرا
-    // الخلفية) مع محاولة تفعيل التركيز التلقائي المستمر (continuous
-    // autofocus) عبر advanced constraints — يدعمها Chrome/Android بشكل مباشر،
-    // وSafari يتجاهلها بأمان دون رمي خطأ إن لم تكن مدعومة
-    function _mainBuildConstraints(targetId, highRes) {
-        const base = targetId
-            ? { deviceId: { exact: targetId } }
-            : { facingMode: { ideal: 'environment' } };
-        return {
-            video: Object.assign({}, base, {
-                width:  { ideal: highRes ? 1920 : 1280 },
-                height: { ideal: highRes ? 1080 : 720 },
-                frameRate: { ideal: 30 },
-                advanced: [{ focusMode: 'continuous' }]
-            })
-        };
-    }
-
-    // [تعديل] معالج موحّد لأي كود يُقرأ من أي محرك (BarcodeDetector أو ZXing)
-    // يحافظ على نفس السلوك الأصلي تماماً: تمرير القيمة إلى onCameraScan()
-    // وعرضها في حقل الإدخال للمراجعة
-    function handleMainDecode(decoded) {
-        onCameraScan(decoded);
-        const code = sanitizeBarcode(decoded);
-        if (code) {
-            const input = document.getElementById('barcodeInput');
-            if (input) input.value = code;
-        }
-    }
-
     async function startCamera(cameraId = null) {
-        if (html5QrScanner) { await html5QrScanner.stop().catch(() => {}); html5QrScanner = null; }
+        await stopScanEngine();
         scanningActive = false;
         const cameraDiv = document.getElementById('cameraDiv');
         const scanLine = document.getElementById('scanLine');
+        const video = document.getElementById('reader2');
         cameraDiv.classList.remove('hidden');
         setScanStatus('scanning', t('scanStatusStarting'));
         try {
             const targetId = cameraId || currentCameraId || (availableCameras[0]?.id);
-
-            const video = _mainCreateVideoEl();
-
-            // [تعديل] محاولة الحصول على أعلى جودة ممكنة، ثم التراجع تدريجياً
-            // إلى قيود أبسط إن رفض المتصفح (بعض إصدارات Safari ترفض الجمع بين
-            // deviceId:exact وadvanced constraints معاً)
-            try {
-                _mainStream = await navigator.mediaDevices.getUserMedia(_mainBuildConstraints(targetId, true));
-            } catch (e1) {
-                try {
-                    _mainStream = await navigator.mediaDevices.getUserMedia(_mainBuildConstraints(targetId, false));
-                } catch (e2) {
-                    const fallback = targetId
-                        ? { video: { deviceId: { exact: targetId } } }
-                        : { video: { facingMode: 'environment' } };
-                    _mainStream = await navigator.mediaDevices.getUserMedia(fallback);
-                }
-            }
-
-            video.srcObject = _mainStream;
+            if (!targetId) throw new Error("لا توجد كاميرا متاحة");
+            const constraints = { video: { deviceId: { exact: targetId }, width: { ideal: 1280 }, height: { ideal: 720 } } };
+            _scanStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = _scanStream;
             await video.play();
 
-            // [تعديل] اختيار محرك القراءة تلقائياً: BarcodeDetector الأصلي إن
-            // وُجد (Android/Chrome)، وإلا يبقى null ليتم تفعيل ZXing كـ fallback
-            if ('BarcodeDetector' in window) {
-                try {
-                    _mainDetector = new BarcodeDetector({
-                        formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','codabar']
-                    });
-                } catch (e) { _mainDetector = null; }
-            } else {
-                _mainDetector = null;
-            }
-
-            // [تعديل] تجهيز قارئ ZXing كمحرك بديل فوري عندما لا يدعم المتصفح
-            // BarcodeDetector (هذا هو الوضع الفعلي على كل إصدارات Safari حالياً)
-            _mainZxingReader = null;
-            if (!_mainDetector && window.ZXing) {
-                const hints = new Map();
-                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                    ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
-                    ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-                    ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-                    ZXing.BarcodeFormat.CODE_93, ZXing.BarcodeFormat.ITF,
-                    ZXing.BarcodeFormat.CODABAR
-                ]);
-                hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-                _mainZxingReader = new ZXing.MultiFormatReader();
-                _mainZxingReader.setHints(hints);
-            }
+            // نفس صيغ الباركود المدعومة سابقاً + أولوية للكاشف الأصلي بالجهاز (أسرع)
+            const supportedFormats = ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','codabar'];
+            _scanDetector = ('BarcodeDetector' in window) ? new BarcodeDetector({ formats: supportedFormats }) : null;
 
             scanningActive = true;
-            currentCameraId = targetId || currentCameraId;
+            currentCameraId = targetId;
             if (scanLine) scanLine.style.display = 'block';
             document.getElementById('closeCamBtn').style.display = 'flex';
             setScanStatus('ready', t('cameraActive'));
             initAudio();
 
-            // [تعديل] واجهة stop() موحّدة متوافقة تماماً مع كل استدعاءات
-            // html5QrScanner.stop().catch(()=>{}) الموجودة في بقية الملف، دون
-            // الحاجة لتعديلها
-            html5QrScanner = {
-                stop: async () => {
-                    scanningActive = false;
-                    if (_mainAnimFrame) { cancelAnimationFrame(_mainAnimFrame); _mainAnimFrame = null; }
-                    if (_mainStream) { _mainStream.getTracks().forEach(tr => tr.stop()); _mainStream = null; }
-                    _mainDetector = null;
-                    _mainZxingReader = null;
-                    const r = document.getElementById('reader2');
-                    if (r) r.innerHTML = '';
-                }
+            const onDecoded = (decoded) => {
+                onCameraScan(decoded);
+                const code = sanitizeBarcode(decoded);
+                if (code) document.getElementById('barcodeInput').value = code;
             };
 
-            // [تعديل] حلقة الفحص: منطقة مسح مركزية أفقية (بديل خاصية qrbox في
-            // html5-qrcode) تقتصر على 55% من ارتفاع الإطار لتحسين سرعة ودقة
-            // قراءة الباركود الخطي، مع تقليل معدل الفحص على آيفون تحديداً
-            // (نقطة 7: fps مناسب لأجهزة iPhone) لتفادي إرهاق المعالج
-            const minInterval = _isIOSDevice ? 70 : 33; // ~14fps على آيفون، ~30fps على أندرويد
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-            async function scanLoop(ts) {
+            async function scanLoop() {
                 if (!scanningActive) return;
-                if (!_mainLastScanTs || ts - _mainLastScanTs >= minInterval) {
-                    _mainLastScanTs = ts;
-                    if (video.readyState >= video.HAVE_ENOUGH_DATA && video.videoWidth) {
-                        const vw = video.videoWidth, vh = video.videoHeight;
-                        const rh = Math.max(120, Math.floor(vh * 0.55));
-                        const ry = Math.floor((vh - rh) / 2);
-                        canvas.width  = vw;
-                        canvas.height = rh;
-                        ctx.drawImage(video, 0, ry, vw, rh, 0, 0, vw, rh);
-
-                        if (_mainDetector) {
-                            try {
-                                const barcodes = await _mainDetector.detect(canvas);
-                                if (barcodes.length > 0) handleMainDecode(barcodes[0].rawValue);
-                            } catch (e) {}
-                        } else if (_mainZxingReader) {
-                            try {
-                                const imgData   = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                                const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
-                                const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-                                const result    = _mainZxingReader.decode(bitmap);
-                                if (result) handleMainDecode(result.getText());
-                            } catch (e) {}
-                        }
-                    }
+                if (_scanDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
+                    try {
+                        const codes = await _scanDetector.detect(video);
+                        if (codes.length > 0) onDecoded(codes[0].rawValue);
+                    } catch (e) {}
                 }
-                _mainAnimFrame = requestAnimationFrame(scanLoop);
+                _scanAnimFrame = requestAnimationFrame(scanLoop);
             }
-            _mainAnimFrame = requestAnimationFrame(scanLoop);
 
+            if (!_scanDetector) {
+                startZxingLoop(video, onDecoded); // fallback لأجهزة ما تدعم BarcodeDetector
+            } else {
+                _scanAnimFrame = requestAnimationFrame(scanLoop);
+            }
         } catch (err) {
             showToast(t('cameraError') + err.message, true);
             cameraDiv.classList.add('hidden');
@@ -2595,9 +2461,50 @@
         }
     }
 
-    async function closeCamera() {
-        if (html5QrScanner) { await html5QrScanner.stop().catch(() => {}); html5QrScanner = null; }
+    // ZXing احتياطي — لأجهزة/متصفحات ما تدعم BarcodeDetector الأصلي
+    function startZxingLoop(video, onDecoded) {
+        if (!window.ZXing) return;
+        const hints = new Map();
+        const formats = [
+            ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+            ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+            ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+            ZXing.BarcodeFormat.CODABAR, ZXing.BarcodeFormat.ITF
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        _scanZxingReader = new ZXing.MultiFormatReader();
+        _scanZxingReader.setHints(hints);
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        function loop() {
+            if (!scanningActive) return;
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+                try {
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
+                    const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+                    const result    = _scanZxingReader.decode(bitmap);
+                    if (result) onDecoded(result.getText());
+                } catch (e) {}
+            }
+            _scanAnimFrame = requestAnimationFrame(loop);
+        }
+        _scanAnimFrame = requestAnimationFrame(loop);
+    }
+
+    async function stopScanEngine() {
         scanningActive = false;
+        if (_scanAnimFrame) { cancelAnimationFrame(_scanAnimFrame); _scanAnimFrame = null; }
+        if (_scanStream)    { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
+        const video = document.getElementById('reader2');
+        if (video) video.srcObject = null;
+        _scanDetector = null; _scanZxingReader = null;
+    }
+
+    async function closeCamera() {
+        await stopScanEngine();
         document.getElementById('cameraDiv').classList.add('hidden');
         document.getElementById('closeCamBtn').style.display = 'none';
         const scanLine = document.getElementById('scanLine');
@@ -2639,7 +2546,6 @@
             tx.objectStore(name).getAll().onsuccess = e => r(e.target.result);
         });
     }
-    function _markDirty(...names) { names.forEach(n => { _cache.dirty[n] = true; }); }
 
     async function _ensureCache(...keys) {
         const needed = keys.filter(k => _cache.dirty[k]);
@@ -2654,74 +2560,53 @@
         return document.querySelector('.panel.active-pane')?.id || 'tab-scan';
     }
 
-    // الإحصائيات العلوية — تُقرأ دائماً من الـ cache
-    async function _updateStats() {
-        await _ensureCache('inventory','scanLog');
-        const invLen  = (_cache.inv  || []).length;
-        const logLen  = (_cache.scanLog || []).length;
-        const prodLen = _cache.prods ? _cache.prods.length : (document.getElementById('totalProductsStat').innerText || 0);
-        document.getElementById('inventoryCount').innerText      = logLen;
-        document.getElementById('totalInventoryStat').innerText  = invLen;
-        document.getElementById('sessionScansStat').innerText    = logLen;
-        if (_cache.prods) document.getElementById('totalProductsStat').innerText = _cache.prods.length;
-    }
-
     // ══════════════════════════════════════════════
-    //  VirtualList — عرض آلاف الصفوف بدون تجميد
+    //  PaginatedList — عرض قوائم كبيرة بالتحميل التدريجي (بدل VirtualList)
     // ══════════════════════════════════════════════
-    class VirtualList {
-        constructor(container, { rowHeight, renderRow, overscan = 5 }) {
-            this.container  = typeof container === 'string' ? document.getElementById(container) : container;
-            this.rowHeight  = rowHeight;
-            this.renderRow  = renderRow;
-            this.overscan   = overscan;
-            this.items      = [];
-            this._raf       = null;
-            this._scrollTop = 0;
+    // قائمة بالتحميل التدريجي (بدون صندوق تمرير متداخل) — بنفس واجهة VirtualList
+    // تُستخدم بدل VirtualList لتفادي تسلسل التمرير (scroll chaining) مع صفحة القوائم الطويلة
+    class PaginatedList {
+        constructor(container, { renderRow, pageSize = 40 }) {
+            this.container = typeof container === 'string' ? document.getElementById(container) : container;
+            this.renderRow = renderRow;
+            this.pageSize  = pageSize;
+            this.items     = [];
+            this.page      = 0;
 
-            // هيكل ثابت: spacer علوي + viewport + spacer سفلي
-            this.container.style.cssText += ';overflow-y:auto;position:relative;';
-            this._top    = Object.assign(document.createElement('div'), { style: 'height:0px;pointer-events:none;' });
-            this._bottom = Object.assign(document.createElement('div'), { style: 'height:0px;pointer-events:none;' });
-            this._port   = document.createElement('div');
-            this.container.appendChild(this._top);
+            this._port = document.createElement('div');
+            this._moreBtn = document.createElement('button');
+            this._moreBtn.type = 'button';
+            this._moreBtn.style.cssText = 'display:none;width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--accent);font-family:\'Cairo\',sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;';
+            this._moreBtn.onclick = () => { this.page++; this._paint(); };
             this.container.appendChild(this._port);
-            this.container.appendChild(this._bottom);
-
-            this._onScroll = () => {
-                this._scrollTop = this.container.scrollTop;
-                if (this._raf) cancelAnimationFrame(this._raf);
-                this._raf = requestAnimationFrame(() => this._paint());
-            };
-            this.container.addEventListener('scroll', this._onScroll, { passive: true });
+            this.container.appendChild(this._moreBtn);
         }
 
         setItems(items) {
-            this.items = items;
-            this._scrollTop = this.container.scrollTop;
+            this.items = items || [];
+            this.page = 0;
             this._paint();
         }
 
         _paint() {
-            const total      = this.items.length;
-            const viewH      = this.container.clientHeight || 600;
-            const rh         = this.rowHeight;
-            const start      = Math.max(0, Math.floor(this._scrollTop / rh) - this.overscan);
-            const end        = Math.min(total, Math.ceil((this._scrollTop + viewH) / rh) + this.overscan);
-            this._top.style.height    = (start * rh) + 'px';
-            this._bottom.style.height = ((total - end) * rh) + 'px';
-            // بناء HTML للصفوف المرئية فقط
-            let html = '';
-            for (let i = start; i < end; i++) html += this.renderRow(this.items[i], i);
-            this._port.innerHTML = html;
+            const shown = this.items.slice(0, (this.page + 1) * this.pageSize);
+            this._port.innerHTML = shown.map((it, i) => this.renderRow(it, i)).join('');
+            const remaining = this.items.length - shown.length;
+            if (remaining > 0) {
+                this._moreBtn.style.display = 'block';
+                this._moreBtn.textContent = `${(typeof t === 'function' ? t('pricesLoadMore') : 'تحميل المزيد')} (${remaining})`;
+            } else {
+                this._moreBtn.style.display = 'none';
+            }
         }
 
         destroy() {
-            this.container.removeEventListener('scroll', this._onScroll);
             this.container.innerHTML = '';
         }
 
-        scrollToTop() { this.container.scrollTop = 0; }
+        scrollToTop() {
+            this.container.scrollIntoView({ behavior: 'auto', block: 'start' });
+        }
     }
 
     // خزّن instances لإعادة الاستخدام
@@ -2745,9 +2630,9 @@
             }
             const tbody = document.createElement('div');
             tbody.id = containerId + '_vl_port';
-            tbody.style.cssText = 'max-height:60vh;overflow-y:auto;';
+            // بدون max-height/overflow — يتحرك مع سكرول الصفحة الطبيعي، بدون صندوق تمرير متداخل
+            _vl[containerId] = new PaginatedList(tbody, opts);
             el.appendChild(tbody);
-            _vl[containerId] = new VirtualList(tbody, opts);
             _vlHeaders[containerId] = headerHtml;
         } else {
             // أعِد استخدام الـ instance — فقط حدّث renderRow لو تغيّرت
@@ -2828,30 +2713,28 @@
         else if (tabId === 'tab-inv') {
             await _ensureCache('inv');
             inventory = (_cache.inv || []).sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
-            const hdr = `<div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:0;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.72rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;">
-                <span>${t('thItemNo')}</span>
-                <span>${t('thBarcode')}</span>
-                <span style="min-width:44px;text-align:center;">${t('thQty')}</span>
-                <span style="min-width:56px;text-align:center;padding-right:4px;">${t('thLastScan')}</span>
-            </div>`;
             const vl = _getOrCreateVL('inventoryFullTable', {
-                rowHeight: 58,
                 renderRow: (i) => {
                     const itemNo  = i.item_no  && i.item_no  !== i.key ? i.item_no  : (i.key && i.key.includes('-') ? i.key : '');
                     const barcode = i.barcode  && i.barcode  !== i.key ? i.barcode  : (i.key && /^\d+$/.test(i.key) ? i.key : '');
-                    return `<div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);gap:8px;min-height:58px;">
+                    const code    = itemNo || barcode || i.key || '—';
+                    const qty     = Number(i.qty) || 0;
+                    const qtyColor = qty===0 ? 'var(--negative)' : qty<=5 ? '#f59e0b' : '#1a4fa8';
+                    const qtyBg    = qty===0 ? 'rgba(220,38,38,0.1)' : qty<=5 ? 'rgba(245,158,11,0.1)' : '#eef4ff';
+                    const timeStr  = i.timestamp ? new Date(i.timestamp).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}) : '';
+                    return `<div class="pr-result-row"
+                        style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">
                         <div style="flex:1;min-width:0;">
-                            <div style="font-size:0.75rem;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(itemNo||'—')}</div>
-                            <div style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${escapeHtml(i.name)}</div>
+                            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);">${escapeHtml(i.name||'—')}</div>
+                            <div style="font-size:10px;color:var(--text-muted);">${escapeHtml(code)}</div>
                         </div>
-                        <div style="flex:1;min-width:0;">
-                            <div style="font-size:0.72rem;color:var(--neutral);font-family:'Courier New',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(barcode||'—')}</div>
+                        <div style="text-align:left;flex-shrink:0;">
+                            <div style="background:${qtyBg};color:${qtyColor};border-radius:8px;font-size:15px;font-weight:800;padding:5px 12px;">${qty}</div>
+                            ${timeStr ? `<div style="font-size:9px;color:var(--text-dim);margin-top:2px;text-align:center;">${timeStr}</div>` : ''}
                         </div>
-                        <div style="flex-shrink:0;min-width:44px;text-align:center;font-size:0.9rem;font-weight:800;color:var(--accent);">${i.qty}</div>
-                        <div style="flex-shrink:0;min-width:56px;text-align:center;font-size:0.66rem;color:var(--text-dim);">${i.timestamp?new Date(i.timestamp).toLocaleTimeString('ar-SA'):'-'}</div>
                     </div>`;
                 }
-            }, hdr);
+            });
             vl.setItems(inventory);
         }
 
@@ -2859,20 +2742,21 @@
         else if (tabId === 'tab-stock') {
             await _ensureCache('stock');
             const stock = _cache.stock || [];
-            const hdr = `<div style="display:grid;grid-template-columns:1fr auto;gap:0;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.75rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;">
-                <span>${t('thItemNo')} · ${t('thName')}</span>
-                <span style="min-width:52px;text-align:center;">${t('thRefQty')}</span>
-            </div>`;
             const vl = _getOrCreateVL('stockTableContainer', {
-                rowHeight: 52,
-                renderRow: (s) => `<div style="display:flex;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);gap:8px;min-height:52px;">
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-size:0.76rem;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.key)}</div>
-                        <div style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(s.name)}</div>
-                    </div>
-                    <div style="flex-shrink:0;min-width:52px;text-align:center;font-size:0.9rem;font-weight:800;color:var(--text);background:var(--surface2);border-radius:8px;padding:4px 8px;">${s.qty}</div>
-                </div>`
-            }, hdr);
+                renderRow: (s) => {
+                    const qty = Number(s.qty) || 0;
+                    const qtyColor = qty===0 ? 'var(--negative)' : qty<=5 ? '#f59e0b' : '#1a4fa8';
+                    const qtyBg    = qty===0 ? 'rgba(220,38,38,0.1)' : qty<=5 ? 'rgba(245,158,11,0.1)' : '#eef4ff';
+                    return `<div class="pr-result-row"
+                        style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);">${escapeHtml(s.name||'—')}</div>
+                            <div style="font-size:10px;color:var(--text-muted);">${escapeHtml(s.key)}</div>
+                        </div>
+                        <div style="background:${qtyBg};color:${qtyColor};border-radius:8px;font-size:15px;font-weight:800;padding:5px 12px;flex-shrink:0;">${qty}</div>
+                    </div>`;
+                }
+            });
             vl.setItems(stock);
         }
 
@@ -2892,6 +2776,7 @@
                 for (const p of prods) {
                     if (p.item_no) prodsMap.set(p.item_no, p);
                     if (p.barcode && p.barcode !== p.item_no) prodsMap.set(p.barcode, p);
+                    if (Array.isArray(p.altBarcodes)) for (const ab of p.altBarcodes) if (ab !== p.item_no) prodsMap.set(ab, p);
                 }
 
                 const allCodes = new Set([...inv.map(i => i.key), ...stock.map(s => s.key)]);
@@ -2931,40 +2816,23 @@
             const lblActual  = t('thActual');
             const lblCounted = t('thCounted');
 
-            const cmpHdr = `<div style="display:flex;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.72rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;gap:8px;">
-                <span style="flex:1;">${t('thItemNo')}</span>
-                <span style="flex:1;">${t('thBarcode')}</span>
-                <span style="min-width:36px;text-align:center;">${lblActual}</span>
-                <span style="min-width:36px;text-align:center;">${lblCounted}</span>
-                <span style="min-width:44px;text-align:center;">${t('thDiff')}</span>
-            </div>`;
             const vl = _getOrCreateVL('comparisonTableDiv', {
-                rowHeight: 58,
                 renderRow: (r) => {
                     const isPos=r.diff>0, isNeg=r.diff<0, isZero=r.diff===0&&r.qi>0;
-                    const bg  = isPos?'rgba(0,180,100,0.09)':isNeg?'rgba(220,60,60,0.09)':isZero?'rgba(0,120,220,0.09)':'';
-                    const clr = isPos?'#10b981':isNeg?'#fb7185':isZero?'#60a5fa':'var(--text)';
+                    const clr = isPos?'#10b981':isNeg?'#fb7185':isZero?'#60a5fa':'var(--text-muted)';
+                    const bg  = isPos?'rgba(16,185,129,0.1)':isNeg?'rgba(220,38,38,0.1)':isZero?'rgba(96,165,250,0.1)':'var(--surface3)';
                     const icon= isPos?'⬆':isNeg?'⬇':isZero?'✓':'—';
-                    return `<div style="display:flex;align-items:center;padding:9px 12px;background:${bg};border-bottom:1px solid rgba(255,255,255,0.05);gap:8px;min-height:58px;">
+                    return `<div class="pr-result-row"
+                        style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">
                         <div style="flex:1;min-width:0;">
-                            <div style="font-size:0.76rem;font-weight:700;color:${clr};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.itemNo||'—')}</div>
-                            <div style="font-size:0.7rem;color:${clr};opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(r.name)}</div>
+                            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);">${escapeHtml(r.name||'—')}</div>
+                            <div style="font-size:10px;color:var(--text-muted);">${escapeHtml(r.itemNo||r.barcode||'—')}</div>
+                            <div style="font-size:10px;color:var(--text-dim);margin-top:2px;">${lblActual} ${r.qs} → ${lblCounted} ${r.qi}</div>
                         </div>
-                        <div style="flex:1;min-width:0;">
-                            <div style="font-size:0.7rem;color:var(--neutral);font-family:'Courier New',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.barcode||'—')}</div>
-                        </div>
-                        <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px;">
-                            <span style="font-size:0.62rem;color:var(--text-dim);">${lblActual}</span>
-                            <span style="font-size:0.82rem;color:var(--text-muted);font-weight:600;">${r.qs}</span>
-                        </div>
-                        <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px;">
-                            <span style="font-size:0.62rem;color:var(--text-dim);">${lblCounted}</span>
-                            <span style="font-size:0.82rem;color:var(--text-muted);font-weight:600;">${r.qi}</span>
-                        </div>
-                        <div style="flex-shrink:0;min-width:44px;text-align:center;font-size:0.95rem;font-weight:900;color:${clr};">${icon}${(r.diff>0?'+':'')+r.diff}</div>
+                        <div style="background:${bg};color:${clr};border-radius:8px;font-size:15px;font-weight:800;padding:5px 12px;flex-shrink:0;">${icon} ${(r.diff>0?'+':'')+r.diff}</div>
                     </div>`;
                 }
-            }, cmpHdr);
+            });
             document.getElementById('statsTotalDiff').innerText = filtered.reduce((a,b)=>a+b.diff,0);
             vl.setItems(filtered);
         }
@@ -2974,38 +2842,26 @@
             await _ensureCache('prods');
             const prods = _cache.prods || [];
             document.getElementById('totalProductsStat').innerText = prods.length;
-            const prodsHdr = `<div style="display:grid;grid-template-columns:1fr 1fr 70px;padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--border);font-size:0.75rem;font-weight:700;color:var(--text-muted);position:sticky;top:0;z-index:2;gap:8px;">
-                <span>${t('thItemNo')}</span>
-                <span>${t('thBarcode')}</span>
-                <span style="text-align:center;">${t('thAction')}</span>
-            </div>`;
             const vl = _getOrCreateVL('productsTableContainer', {
-                rowHeight: 66,
                 renderRow: (p) => {
-                    const priceHtml = (p.price_orig || p.price_sale)
-                        ? `<div style="font-size:0.67rem;color:#f59e0b;margin-top:2px;">
-                             ${p.price_sale || p.price_orig}
-                             ${p.price_orig && p.price_sale && p.price_orig !== p.price_sale
-                               ? `<span style="text-decoration:line-through;color:var(--text-dim);margin-right:3px;">${p.price_orig}</span>`
-                               : ''}
-                           </div>`
-                        : '';
-                    return `<div style="display:grid;grid-template-columns:1fr 1fr 70px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);gap:8px;min-height:66px;">
-                        <div style="min-width:0;">
-                            <div style="font-size:0.76rem;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.item_no||'—')}</div>
-                            <div style="font-size:0.72rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${escapeHtml(p.name||'—')}</div>
+                    const hasDisc = p.price_orig && p.price_sale && parseFloat(p.price_orig) !== parseFloat(p.price_sale);
+                    const discPct = hasDisc ? Math.round((1 - parseFloat(p.price_sale)/parseFloat(p.price_orig)) * 100) : 0;
+                    return `<div onclick="window.editProductById('${p.id}')" class="pr-result-row"
+                        style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);">${escapeHtml(p.name||'—')}</div>
+                            <div style="font-size:10px;color:var(--text-muted);">${escapeHtml(p.item_no||p.barcode||'—')}</div>
                         </div>
-                        <div style="min-width:0;">
-                            <div style="font-size:0.72rem;color:var(--text-muted);font-family:'Courier New',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.barcode||'—')}</div>
-                            ${priceHtml}
-                        </div>
-                        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-                            <button onclick="window.editProductById('${p.id}')" style="width:100%;font-size:0.65rem;padding:4px 6px;background:rgba(14,165,233,0.12);color:#38bdf8;border:1px solid rgba(14,165,233,0.25);border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;">✏️</button>
-                            <button onclick="window.deleteProductById('${p.id}')" style="width:100%;font-size:0.65rem;padding:4px 6px;background:rgba(220,38,38,0.1);color:#fb7185;border:1px solid rgba(220,38,38,0.2);border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;">${t('deleteBtn')}</button>
+                        <div style="text-align:left;flex-shrink:0;">
+                            ${(p.price_orig || p.price_sale) ? `
+                            <div style="color:#f59e0b;font-size:15px;font-weight:700;">${p.price_sale || p.price_orig}</div>
+                            ${hasDisc ? `<div style="color:var(--text-muted);font-size:10px;text-decoration:line-through;">${p.price_orig}</div>
+                            <div style="background:rgba(220,38,38,0.1);color:var(--negative);border-radius:5px;font-size:10px;font-weight:700;padding:1px 5px;text-align:center;">${discPct}%</div>` : ''}
+                            ` : `<div style="color:var(--text-dim);font-size:11px;">—</div>`}
                         </div>
                     </div>`;
                 }
-            }, prodsHdr);
+            });
             vl.setItems(prods);
         }
     }
@@ -3391,6 +3247,62 @@
         }
     };
 
+    document.getElementById('dedupeProductsBtn').onclick = () => {
+        customConfirm(t('dedupeConfirm'), async () => {
+        showProgress(t('dedupeProducts'), t('reading'), 10);
+        try {
+            const prods = await new Promise(r => {
+                const tx = db.transaction("products","readonly");
+                tx.objectStore("products").getAll().onsuccess = e => r(e.target.result);
+            });
+            updateProgress(30, t('processing'));
+            // جمّع المنتجات حسب رقم الصنف (أو الباركود إن ما فيه رقم صنف)
+            const groups = new Map();
+            for (const p of prods) {
+                const key = p.item_no || p.barcode;
+                if (!key) continue;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(p);
+            }
+            let mergedGroups = 0, removedCount = 0;
+            const tx = db.transaction("products", "readwrite");
+            const store = tx.objectStore("products");
+            for (const [key, group] of groups) {
+                if (group.length < 2) continue;
+                // رتّب حسب id (الأقدم أولاً) عشان السعر المعتمد يكون أول سعر مسجّل
+                group.sort((a,b) => String(a.id).localeCompare(String(b.id)));
+                const base = group[0];
+                let mainBarcode = base.barcode;
+                let altBarcodes = Array.isArray(base.altBarcodes) ? base.altBarcodes.slice() : [];
+                let name = base.name;
+                for (let i = 1; i < group.length; i++) {
+                    const p = group[i];
+                    if (!name || name === t('noName')) name = p.name || name;
+                    const candidates = [p.barcode, ...(Array.isArray(p.altBarcodes) ? p.altBarcodes : [])];
+                    for (const bc of candidates) {
+                        if (!bc) continue;
+                        if (!mainBarcode) { mainBarcode = bc; }
+                        else if (bc !== mainBarcode && !altBarcodes.includes(bc)) { altBarcodes.push(bc); }
+                    }
+                    store.delete(p.id);
+                    removedCount++;
+                }
+                store.put({ ...base, barcode: mainBarcode, altBarcodes, name, item_no: base.item_no || key });
+                mergedGroups++;
+            }
+            await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+            updateProgress(100, t('doneMsg'));
+            hideProgress();
+            if (mergedGroups === 0) showToast(t('dedupeNone'));
+            else showToast(`✅ ${t('dedupeDone')} ${mergedGroups} — ${t('dedupeRemoved')} ${removedCount}`);
+            updateAllUI(["prods"]);
+        } catch(err) {
+            hideProgress();
+            showToast('❌ ' + err.message, true);
+        }
+        });
+    };
+
     document.getElementById('exportCompareBtn').onclick = async () => {
         showProgress(t('exportingCompare'), t('collectingData'), 10);
         try {
@@ -3492,7 +3404,7 @@
 
     document.getElementById('globalResetBtn').onclick = () => {
         customConfirm("⚠️ سيتم حذف جميع البيانات نهائياً. متابعة؟", () => {
-            if (html5QrScanner) { html5QrScanner.stop().catch(() => {}); html5QrScanner = null; }
+            stopScanEngine();
             if (db) { db.close(); db = null; }
             const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
             deleteRequest.onsuccess = () => window.location.reload();
@@ -3510,6 +3422,7 @@
         document.getElementById('modalQty').value = '0';
         document.getElementById('modalPriceOrig').value = '';
         document.getElementById('modalPriceSale').value = '';
+        document.getElementById('deleteProductModalBtn').style.display = 'none';
         document.getElementById('productModal').style.display = 'flex';
     };
     document.getElementById('closeModalBtn').onclick = () => document.getElementById('productModal').style.display = 'none';
@@ -3570,7 +3483,14 @@
         const stx = db.transaction("stock", "readonly");
         const stk = await new Promise(r => stx.objectStore("stock").get(p.item_no || p.barcode).onsuccess = e => r(e.target.result));
         document.getElementById('modalQty').value = stk ? stk.qty : 0;
+        document.getElementById('deleteProductModalBtn').style.display = 'block';
         document.getElementById('productModal').style.display = 'flex';
+    };
+    document.getElementById('deleteProductModalBtn').onclick = () => {
+        const id = document.getElementById('modalEditId').value;
+        if (!id) return;
+        document.getElementById('productModal').style.display = 'none';
+        window.deleteProductById(id);
     };
     document.getElementById('stockUploadArea').addEventListener('click',()=>document.getElementById('stockFileInput').click());
     document.getElementById('dbUploadArea').addEventListener('click',()=>document.getElementById('dbFileInput').click());
@@ -3688,15 +3608,28 @@
         setTimeout(() => document.getElementById('progressOverlay').classList.remove('show'), 400);
     }
 
-    // ── تبديل الثيم ──
+    // ── تبديل الثيم: الوضع النهاري هو الافتراضي دائماً، وزر التبديل يدوياً يبقى شغّال ويُحفظ تفضيله ──
     const themeBtn = document.getElementById('themeToggle');
-    const savedTheme = localStorage.getItem('invTheme') || 'dark';
-    if (savedTheme === 'light') { document.body.classList.add('light-theme'); themeBtn.innerHTML = '<i class="fas fa-sun"></i>'; }
+    const savedTheme = localStorage.getItem('invTheme'); // null يعني ما فيه تفضيل يدوي محفوظ بعد
+    const useLight = savedTheme ? (savedTheme === 'light') : true; // الافتراضي: نهاري
+    if (useLight) { document.body.classList.add('light-theme'); themeBtn.innerHTML = '<i class="fas fa-sun"></i>'; }
     themeBtn.onclick = () => {
         const isLight = document.body.classList.toggle('light-theme');
         themeBtn.innerHTML = isLight ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
         localStorage.setItem('invTheme', isLight ? 'light' : 'dark');
     };
+
+    // مساعد: تحويل قيمة تاريخ/وقت من إكسل (رقم تسلسلي أو نص) إلى timestamp، وإلا يرجع القيمة الافتراضية
+    function parseInvTimestamp(val, fallback) {
+        if (val === undefined || val === null || val === '') return fallback;
+        if (typeof val === 'number') {
+            if (val > 1e11) return val; // يبدو timestamp مباشر بالمللي ثانية
+            if (val > 20000 && val < 100000) return Math.round((val - 25569) * 86400 * 1000); // رقم تسلسلي إكسل
+            return fallback;
+        }
+        const parsed = Date.parse(String(val));
+        return isNaN(parsed) ? fallback : parsed;
+    }
 
     // ── استيراد الجرد ──
     function importInventory(mode) {
@@ -3707,11 +3640,17 @@
             file.name,
             file,
             [
-                { id: 'key',  label: t('itemNoBarcode'), icon: 'fas fa-hashtag',    color: 'var(--accent)',     required: true,  keywords: ['رقم الصنف','رقم','باركود','barcode','item','كود','صنف'] },
-                { id: 'name', label: t('thName'),        icon: 'fas fa-tag',        color: 'var(--text-muted)', required: false, keywords: ['اسم','name','وصف','desc','المادة'] },
-                { id: 'qty',  label: t('thQty'),         icon: 'fas fa-layer-group', color: 'var(--gold)',      required: true,  keywords: ['كمية','qty','quant','count','الفعلي','تحويل','النهائي'] },
+                { id: 'barcode',  label: t('thBarcode'),   icon: 'fas fa-barcode',     color: 'var(--accent)',     required: false, keywords: ['باركود','barcode'] },
+                { id: 'itemno',   label: t('thItemNo'),    icon: 'fas fa-hashtag',     color: 'var(--accent)',     required: false, keywords: ['رقم الصنف','رقم','item','صنف'] },
+                { id: 'name',     label: t('thName'),      icon: 'fas fa-tag',         color: 'var(--text-muted)', required: false, keywords: ['اسم','name','وصف','desc','المادة'] },
+                { id: 'qty',      label: t('thQty'),       icon: 'fas fa-layer-group', color: 'var(--gold)',       required: true,  keywords: ['كمية','qty','quant','count','الفعلي','تحويل','النهائي'] },
+                { id: 'lastScan', label: t('thLastScan'),  icon: 'fas fa-clock',       color: 'var(--text-muted)', required: false, keywords: ['آخر مسح','تاريخ','date','time','مسح'] },
             ],
             async function(colMap) {
+                if (colMap.barcode === null && colMap.itemno === null) {
+                    showToast(t('pleaseSelect') + ': ' + t('thBarcode') + ' / ' + t('thItemNo'), true);
+                    return;
+                }
                 showProgress(t('importingInv'), t('reading'), 5);
                 try {
                     updateProgress(20, t('analyzing'));
@@ -3719,17 +3658,37 @@
                     const rows = colMap.noHeader ? allRows : allRows.slice(1);
                     if (!rows.length) { hideProgress(); showToast(t('emptyFile'), true); return; }
                     const now = Date.now();
+
                     if (mode === 'replace') {
                         updateProgress(30, t('clearingOld'));
                         await new Promise(r => { const tx=db.transaction(['inventory','scanLog'],'readwrite'); tx.objectStore('inventory').clear(); tx.objectStore('scanLog').clear(); tx.oncomplete=r; });
                     }
+
+                    const getStr = (row, idx) => idx === null ? '' : String(row[idx]||'').trim().replace(/\.0+$/,'');
                     const validRows = rows.filter(row => {
                         if (!Array.isArray(row)) return false;
-                        const key = String(row[colMap.key]||'').trim().replace(/\.0+$/,'');
+                        const barcode = getStr(row, colMap.barcode);
+                        const itemno  = getStr(row, colMap.itemno);
                         const qty = parseInt(row[colMap.qty]) || 0;
-                        return key && qty > 0;
+                        return (barcode || itemno) && qty > 0;
                     });
                     const total = validRows.length;
+                    if (!total) { hideProgress(); showToast(t('emptyFile'), true); return; }
+
+                    // في وضع الدمج: خرائط مبنية مرة واحدة لكل الاستيراد (بدل جلب متكرر لكل دفعة)
+                    let byKey = new Map();
+                    if (mode === 'merge') {
+                        const allExisting = await new Promise(r => {
+                            const rtx = db.transaction('inventory', 'readonly');
+                            rtx.objectStore('inventory').getAll().onsuccess = e => r(e.target.result);
+                        });
+                        for (const rec of allExisting) {
+                            if (rec.item_no) byKey.set(rec.item_no, rec);
+                            if (rec.barcode) byKey.set(rec.barcode, rec);
+                            if (rec.key)     byKey.set(rec.key, rec);
+                        }
+                    }
+
                     const BATCH = 500;
                     let count = 0;
                     for (let start = 0; start < validRows.length; start += BATCH) {
@@ -3738,48 +3697,42 @@
                         const tx = db.transaction(['inventory','scanLog'], 'readwrite');
                         const invS = tx.objectStore('inventory');
                         const logS = tx.objectStore('scanLog');
-                        if (mode === 'merge') {
-                            const batchKeys = batch.map(row => String(row[colMap.key]||'').trim().replace(/\.0+$/,''));
-                            const existingMap = await new Promise(r => {
-                                const rtx = db.transaction('inventory', 'readonly');
-                                const rstore = rtx.objectStore('inventory');
-                                const results = {};
-                                let pending = batchKeys.length;
-                                batchKeys.forEach(k => {
-                                    rstore.get(k).onsuccess = e => {
-                                        if (e.target.result) results[k] = e.target.result;
-                                        if (--pending === 0) r(results);
-                                    };
-                                });
-                            });
-                            for (const row of batch) {
-                                const key  = String(row[colMap.key]||'').trim().replace(/\.0+$/,'');
-                                const name = colMap.name !== null ? String(row[colMap.name]||'').trim() : '';
-                                const qty  = parseInt(row[colMap.qty]) || 0;
-                                count++;
-                                const existing = existingMap[key];
-                                const newQty = (existing ? existing.qty : 0) + qty;
-                                invS.put({ key, name: existing?.name||name, qty: newQty, barcode: existing?.barcode||key, item_no: key, timestamp: now });
-                                logS.add({ itemCode: key, name: existing?.name||name, barcode: key, timestamp: now + count });
-                            }
-                        } else {
-                            for (const row of batch) {
-                                const key  = String(row[colMap.key]||'').trim().replace(/\.0+$/,'');
-                                const name = colMap.name !== null ? String(row[colMap.name]||'').trim() : '';
-                                const qty  = parseInt(row[colMap.qty]) || 0;
-                                count++;
-                                invS.put({ key, name, qty, barcode: key, item_no: key, timestamp: now });
-                                logS.add({ itemCode: key, name, barcode: key, timestamp: now + count });
+
+                        for (const row of batch) {
+                            const barcode = getStr(row, colMap.barcode);
+                            const itemno  = getStr(row, colMap.itemno);
+                            const name    = colMap.name !== null ? String(row[colMap.name]||'').trim() : '';
+                            const qty     = parseInt(row[colMap.qty]) || 0;
+                            const scanTs  = colMap.lastScan !== null ? parseInvTimestamp(row[colMap.lastScan], now) : now;
+                            const key     = itemno || barcode;
+                            count++;
+
+                            let existing = mode === 'merge' ? ((itemno && byKey.get(itemno)) || (barcode && byKey.get(barcode))) : null;
+                            const newQty  = (existing ? existing.qty : 0) + qty;
+                            const record  = {
+                                key,
+                                name: name || existing?.name || '',
+                                qty: newQty,
+                                barcode: barcode || existing?.barcode || key,
+                                item_no: itemno || existing?.item_no || key,
+                                timestamp: scanTs
+                            };
+                            invS.put(record);
+                            logS.add({ itemCode: key, name: record.name, barcode: record.barcode, timestamp: now + count });
+
+                            if (mode === 'merge') {
+                                if (record.item_no) byKey.set(record.item_no, record);
+                                if (record.barcode) byKey.set(record.barcode, record);
                             }
                         }
-                        await new Promise(r => { tx.oncomplete = r; });
+                        await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
                     }
                     updateProgress(100, t('doneMsg'));
                     hideProgress();
                     showToast(`✓ ${t('importedItems')} ${count} — ${mode==='replace'? t('update') : t('merge')}`);
                     document.getElementById('invImportFile').value = '';
                     updateAllUI(["inv","scanLog","cmpRows"]);
-                } catch(e) { console.error(e); hideProgress(); showToast(t('fileReadError'), true); }
+                } catch(e) { console.error(e); hideProgress(); showToast(t('fileReadError') + ': ' + (e && e.message ? e.message : e), true); }
             }
         );
     }
@@ -3789,9 +3742,8 @@
         let target = this.getAttribute('data-tab');
         // أغلق الكاميرا فوراً عند مغادرة تبويب المسح
         if (target !== 'tab-scan') {
-            if (html5QrScanner) {
-                html5QrScanner.stop().catch(() => {});
-                html5QrScanner = null;
+            if (_scanStream) {
+                stopScanEngine();
             }
             scanningActive = false;
             const scanLine = document.getElementById('scanLine');
@@ -3878,7 +3830,7 @@
         // بحث المنتجات
         setupSearch('searchProducts',
             () => (_cache.prods || []),
-            (term, p) => q(p.item_no).includes(term) || q(p.barcode).includes(term) || q(p.name).includes(term),
+            (term, p) => q(p.item_no).includes(term) || q(p.barcode).includes(term) || (Array.isArray(p.altBarcodes) && p.altBarcodes.some(ab=>q(ab).includes(term))) || q(p.name).includes(term),
             'productsTableContainer'
         );
     }
@@ -3948,6 +3900,11 @@
             productsMergeDesc: 'دمج: يُضيف المنتجات الجديدة مع الحفاظ على الموجودة',
             processProducts: 'معالجة ورفع المنتجات',
             exportProducts: 'تصدير المنتجات',
+            dedupeProducts: 'دمج المنتجات المكررة',
+            dedupeConfirm: 'سيتم دمج كل المنتجات المكررة (نفس رقم الصنف) في منتج واحد، ودمج باركوداتها معاً. هل تريد المتابعة؟',
+            dedupeNone: 'لا توجد منتجات مكررة',
+            dedupeDone: 'تم دمج',
+            dedupeRemoved: 'وحذف',
             editProduct: 'تعديل منتج',
             productUpdated: 'تم تحديث المنتج',
             fillRequired: 'يرجى ملء الحقول الأساسية',
@@ -4184,6 +4141,11 @@
             productsMergeDesc: 'Merge: adds new products while keeping existing ones',
             processProducts: 'Process & Upload Products',
             exportProducts: 'Export Products',
+            dedupeProducts: 'Merge Duplicate Products',
+            dedupeConfirm: 'This will merge all duplicate products (same item number) into one, combining their barcodes. Continue?',
+            dedupeNone: 'No duplicate products found',
+            dedupeDone: 'Merged',
+            dedupeRemoved: 'and removed',
             editProduct: 'Edit Product',
             productUpdated: 'Product updated',
             fillRequired: 'Please fill required fields',
@@ -4467,6 +4429,7 @@ async function rebuildPricesIndex() {
         PR_LIST.push([code, name, orig, sale, disc, stk, p.item_no||'', p.barcode||'']);
         if (p.item_no) { PR_CODE_MAP[p.item_no]   = idx; matchedStockKeys.add(p.item_no); }
         if (p.barcode) { PR_CODE_MAP[p.barcode]   = idx; PR_BARCODE_MAP[p.barcode] = idx; matchedStockKeys.add(p.barcode); }
+        if (Array.isArray(p.altBarcodes)) for (const ab of p.altBarcodes) { PR_CODE_MAP[ab] = idx; PR_BARCODE_MAP[ab] = idx; matchedStockKeys.add(ab); }
     });
 
     // أضف كل أصناف المرجع التي لم تُطابَق مع أي منتج
@@ -4527,10 +4490,14 @@ function setPriceSearchType(t) {
 // تهيئة زر الباركود كنشط عند أول تحميل
 setTimeout(() => setPriceSearchType('barcode'), 100);
 
+let _priceSearchDebounce = null;
 function onPriceSearchInput() {
-    const v = document.getElementById('prices-search-input').value.trim();
-    if (priceSearchType === 'name' && v.length >= 2) doPriceSearch();
-    if (priceSearchType === 'code' && v.length >= 3) doPriceSearch();
+    clearTimeout(_priceSearchDebounce);
+    _priceSearchDebounce = setTimeout(() => {
+        const v = document.getElementById('prices-search-input').value.trim();
+        if (priceSearchType === 'name' && v.length >= 2) doPriceSearch();
+        if (priceSearchType === 'code' && v.length >= 3) doPriceSearch();
+    }, 180);
 }
 
 async function doPriceSearch() {
@@ -4557,20 +4524,29 @@ async function doPriceSearch() {
             p[0].toLowerCase().includes(ql) ||
             (p[6] && p[6].toLowerCase().includes(ql)) ||
             (p[7] && p[7].toLowerCase().includes(ql))
-        ).slice(0, 20);
+        ).sort((a, b) => (b[5]||0) - (a[5]||0));
         area.innerHTML = renderPriceResultList(results, `${t('pricesNoResults')} "${q}"`);
     } else {
         const ql      = q.toLowerCase();
-        const results = PR_LIST.filter(p => p[1].toLowerCase().includes(ql)).slice(0, 20);
+        const results = PR_LIST.filter(p => p[1].toLowerCase().includes(ql)).sort((a, b) => (b[5]||0) - (a[5]||0));
         area.innerHTML = renderPriceResultList(results, `${t('pricesNoResults')} "${q}"`);
     }
 }
 
+let _prLastResults = [], _prLastEmptyMsg = '', _prLimit = 50;
 function renderPriceResultList(results, emptyMsg) {
+    _prLastResults = results; _prLastEmptyMsg = emptyMsg; _prLimit = 50;
+    return _paintPriceResultList();
+}
+function _paintPriceResultList() {
+    const results = _prLastResults, emptyMsg = _prLastEmptyMsg;
     if (!results.length) return `<div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:12px;color:var(--negative);font-size:13px;text-align:center;">❌ ${emptyMsg}</div>`;
     if (results.length === 1) return renderPriceProduct(results[0]);
-    const rows = results.map((p, i) => {
+    const shown = results.slice(0, _prLimit);
+    const rows = shown.map((p, i) => {
         const hasDisc = p[2] && p[3] && parseFloat(p[2]) !== parseFloat(p[3]);
+        const stk = p[5] !== null && p[5] !== undefined ? Number(p[5]) : null;
+        const stkBadge = stk !== null ? `<div style="background:${stk===0?'rgba(220,38,38,0.1)':stk<=5?'rgba(245,158,11,0.1)':'#eef4ff'};color:${stk===0?'var(--negative)':stk<=5?'#f59e0b':'#1a4fa8'};border-radius:5px;font-size:10px;font-weight:700;padding:1px 5px;margin-top:2px;display:inline-block;">📦 ${stk}</div>` : '';
         return `<div data-pcode="${escapeHtml(p[0])}" class="pr-result-row"
             style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s;">
             <div style="flex:1;min-width:0;">
@@ -4581,10 +4557,19 @@ function renderPriceResultList(results, emptyMsg) {
                 <div style="color:#f59e0b;font-size:15px;font-weight:700;">${p[3] || p[2] || '—'}</div>
                 ${hasDisc ? `<div style="color:var(--text-muted);font-size:10px;text-decoration:line-through;">${p[2]}</div>` : ''}
                 ${p[4] ? `<div style="background:rgba(220,38,38,0.1);color:var(--negative);border-radius:5px;font-size:10px;font-weight:700;padding:1px 5px;text-align:center;">${p[4]}%</div>` : ''}
+                ${stkBadge}
             </div>
         </div>`;
     }).join('');
-    return `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-align:center;">🔎 ${results.length} ${t('pricesResultsCount')}</div>${rows}`;
+    const remaining = results.length - shown.length;
+    const moreBtn = remaining > 0
+        ? `<button onclick="_prLoadMore()" style="display:block;width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--accent);font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;">${t('pricesLoadMore')} (${remaining})</button>`
+        : '';
+    return `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-align:center;">🔎 ${results.length} ${t('pricesResultsCount')}</div>${rows}${moreBtn}`;
+}
+function _prLoadMore() {
+    _prLimit += 50;
+    document.getElementById('prices-result-area').innerHTML = _paintPriceResultList();
 }
 
 // تفويض الحدث على منطقة النتائج
@@ -4810,23 +4795,12 @@ async function psStartScanner() {
     if (line) line.style.display = 'block';
 
     const camId = _psSelectedCam || (_psCameras.length ? _psCameras[_psCameras.length - 1].id : null);
-    // [تعديل] رفع جودة الفيديو المطلوبة (أعلى إعدادات مناسبة للكاميرا الخلفية)
-    // مع محاولة تفعيل التركيز التلقائي المستمر، ثم التراجع تدريجياً إلى قيود
-    // أبسط إن رفضها المتصفح — بعض إصدارات Safari ترفض advanced constraints
-    // مجتمعة مع deviceId:exact
-    const highConstraints = camId
-        ? { video: { deviceId: { exact: camId }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] } }
-        : { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] } };
-    const lowConstraints = camId
+    const constraints = camId
         ? { video: { deviceId: { exact: camId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
         : { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
 
     try {
-        try {
-            _psStream = await navigator.mediaDevices.getUserMedia(highConstraints);
-        } catch (eHigh) {
-            _psStream = await navigator.mediaDevices.getUserMedia(lowConstraints);
-        }
+        _psStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = _psStream;
         await video.play();
     } catch (e) {
@@ -4851,24 +4825,17 @@ async function psStartScanner() {
     btn.disabled = false;
 
     // حلقة المسح بـ BarcodeDetector
-    // [تعديل] تقليل معدل الفحص على آيفون فقط (fps مناسب لأجهزة iPhone) لتفادي
-    // إرهاق المعالج، مع الإبقاء على السرعة الكاملة على أندرويد
-    const _psMinInterval = (typeof _isIOSDevice !== 'undefined' && _isIOSDevice) ? 70 : 0;
-    let _psLastScanTs = 0;
-    async function psScanLoop(ts) {
+    async function psScanLoop() {
         if (!_psScanning) return;
-        if (!_psMinInterval || !_psLastScanTs || ts - _psLastScanTs >= _psMinInterval) {
-            _psLastScanTs = ts;
-            if (_psDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
-                try {
-                    const barcodes = await _psDetector.detect(video);
-                    if (barcodes.length > 0 && !_psCooldown) {
-                        _psCooldown = true;
-                        psOnBarcodeFound(barcodes[0].rawValue);
-                        setTimeout(() => { _psCooldown = false; }, 1500);
-                    }
-                } catch (e) {}
-            }
+        if (_psDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
+            try {
+                const barcodes = await _psDetector.detect(video);
+                if (barcodes.length > 0 && !_psCooldown) {
+                    _psCooldown = true;
+                    psOnBarcodeFound(barcodes[0].rawValue);
+                    setTimeout(() => { _psCooldown = false; }, 1500);
+                }
+            } catch (e) {}
         }
         _psAnimFrame = requestAnimationFrame(psScanLoop);
     }
@@ -4909,23 +4876,13 @@ function psStartZxingLoop(video) {
         ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
         ZXing.BarcodeFormat.QR_CODE
     ];
-    // [تعديل] TRY_HARDER يحسّن الدقة مع الباركود الخطي متوسط الجودة/الإضاءة
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
     _psZxingReader = new ZXing.MultiFormatReader();
     _psZxingReader.setHints(hints);
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    // [تعديل] نفس مبدأ تقليل معدل الفحص على آيفون المستخدم في المحرك الرئيسي
-    const _zxMinInterval = (typeof _isIOSDevice !== 'undefined' && _isIOSDevice) ? 70 : 0;
-    let _zxLastScanTs = 0;
-    function zLoop(ts) {
+    const ctx = canvas.getContext('2d');
+    function zLoop() {
         if (!_psScanning) return;
-        if (_zxMinInterval && _zxLastScanTs && ts - _zxLastScanTs < _zxMinInterval) {
-            _psAnimFrame = requestAnimationFrame(zLoop);
-            return;
-        }
-        _zxLastScanTs = ts;
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
             canvas.width  = video.videoWidth;
             canvas.height = video.videoHeight;
