@@ -2365,6 +2365,28 @@
 
     // ── كاميرا محسّنة (BarcodeDetector أولاً، وZXing احتياطي — نفس منطق تبويب الأسعار) ──
     let _scanStream = null, _scanAnimFrame = null, _scanDetector = null, _scanZxingReader = null;
+
+    // اختيار أفضل كاميرا خلفية للمسح: العدسة الأساسية (wide) وليس Ultra Wide/Telephoto
+    // لأن آيفون (iOS 16.3+) بيرجّع كل عدسة خلفية كـ"كاميرا" منفصلة، والعدسات
+    // الواسعة/التقريب مش بتقدر تركّز على مسافة قريبة زي الباركود.
+    function pickBestBackCamera(cameras) {
+        if (!cameras || !cameras.length) return null;
+        const isFront = d => /front|أمام/i.test(d.label);
+        const isWideExtra = d => /ultra\s*-?\s*wide|telephoto|zoom|tele\b/i.test(d.label);
+        const backCandidates = cameras.filter(d => !isFront(d));
+        return (
+            // 1) تطابق دقيق لاسم العدسة الأساسية "Back Camera" فقط (بدون Ultra Wide/Telephoto)
+            backCandidates.find(d => /^back camera$/i.test(d.label.trim())) ||
+            // 2) أي كاميرا خلفية ما فيهاش كلمة Ultra Wide/Telephoto في الاسم
+            backCandidates.find(d => /back|rear|خلفية|environment/i.test(d.label) && !isWideExtra(d)) ||
+            // 3) أي كاميرا خلفية حتى لو Ultra Wide (أفضل من الأمامية)
+            backCandidates.find(d => /back|rear|خلفية|environment/i.test(d.label)) ||
+            // 4) لو مفيش أسماء واضحة (أجهزة قديمة)، آخر كاميرا في القائمة غالبًا خلفية
+            backCandidates[backCandidates.length - 1] ||
+            cameras[cameras.length - 1]
+        );
+    }
+
     async function listCameras() {
         try {
             await navigator.mediaDevices.getUserMedia({ video: true })
@@ -2385,11 +2407,9 @@
                 let selectedCam = savedCamId
                     ? availableCameras.find(d => d.id === savedCamId)
                     : null;
-                // الأولوية: الكاميرا رقم 3 (index 2)، ثم الخلفية، ثم الأخيرة
+                // الأولوية: الكاميرا الخلفية الأساسية (وليس Ultra Wide/Telephoto)
                 if (!selectedCam) {
-                    selectedCam = availableCameras[2]   // كاميرا 3
-                        || availableCameras.find(d => /back|rear|خلفية|environment/i.test(d.label))
-                        || availableCameras[availableCameras.length - 1];
+                    selectedCam = pickBestBackCamera(availableCameras);
                 }
                 currentCameraId = selectedCam.id;
                 select.value = currentCameraId;
@@ -4757,12 +4777,8 @@ async function psLoadCameraList() {
             opt.textContent = cam.label;
             sel.appendChild(opt);
         });
-        // اختيار الكاميرا الخلفية تلقائياً (camera 3 أو back/rear)
-        const preferred = _psCameras.find(c => /camera\s*3/i.test(c.label))
-            || _psCameras.find(c => /\b3\b.*back|back.*\b3\b/i.test(c.label))
-            || _psCameras[3]
-            || _psCameras.find(c => /back|rear/i.test(c.label))
-            || _psCameras[_psCameras.length - 1];
+        // اختيار الكاميرا الخلفية الأساسية تلقائياً (وليس Ultra Wide/Telephoto)
+        const preferred = pickBestBackCamera(_psCameras);
         sel.value = preferred.id;
         _psSelectedCam = preferred.id;
     } catch (e) {
