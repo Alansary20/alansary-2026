@@ -674,31 +674,14 @@
             box-shadow: none;
         }
 
-        /* Force the video inside to fill */
+        /* Force the video inside to fill — keep intrinsic frames intact for iOS canvas capture */
         .camera-wrapper video,
         .camera-wrapper #reader2,
         .camera-wrapper #reader2 > * {
             width: 100% !important;
-            height: 280px !important;
+            height: 100% !important;
             object-fit: cover !important;
-        }
-
-        /* Scan line animation */
-        .camera-wrapper::after {
-            content: '';
-            position: absolute;
-            left: 10%; right: 10%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #10b981, transparent);
-            border-radius: 2px;
-            animation: scanLine 1.8s ease-in-out infinite;
-            pointer-events: none;
-            box-shadow: 0 0 8px rgba(16,185,129,0.6);
-        }
-        @keyframes scanLine {
-            0%   { top: 15%; opacity: 0.4; }
-            50%  { top: 82%; opacity: 1; }
-            100% { top: 15%; opacity: 0.4; }
+            display: block;
         }
 
         /* Corner guides */
@@ -1178,9 +1161,7 @@
             <!-- زر إغلاق الكاميرا — يظهر فوق الكاميرا حين تكون نشطة -->
             <!-- نافذة الكاميرا -->
             <div id="cameraDiv" class="camera-wrapper hidden" style="position:relative;">
-                <video id="reader2" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></video>
-                <!-- خط المسح المتحرك -->
-                <div id="scanLine" style="display:none; position:absolute; left:10%; right:10%; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); border-radius:2px; animation:scanAnim 1.8s ease-in-out infinite; top:50%; z-index:10; box-shadow:0 0 10px var(--accent);"></div>
+                <video id="reader2" autoplay muted playsinline webkit-playsinline disablepictureinpicture style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></video>
             </div>
 
             <button id="closeCamBtn" style="
@@ -1497,9 +1478,8 @@
 
                 <!-- ── منطقة السكانر ── -->
                 <div id="ps-scanner-wrap" style="display:none;background:#000;border-radius:14px;overflow:hidden;margin-top:10px;position:relative;aspect-ratio:4/3;max-height:260px;">
-                    <video id="ps-scanner-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;border-radius:inherit;z-index:1;"></video>
+                    <video id="ps-scanner-video" autoplay muted playsinline webkit-playsinline disablepictureinpicture style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;border-radius:inherit;z-index:1;"></video>
                     <div id="ps-scan-flash" style="display:none;position:absolute;inset:0;border-radius:14px;pointer-events:none;z-index:20;"></div>
-                    <div id="ps-scan-line" style="display:none;position:absolute;left:10%;right:10%;height:2px;background:linear-gradient(90deg,transparent,#f59e0b,transparent);border-radius:2px;animation:psScanAnim 1.8s ease-in-out infinite;top:50%;z-index:10;box-shadow:0 0 10px #f59e0b;"></div>
                 </div>
 
                 <!-- اختيار الكاميرا -->
@@ -1727,10 +1707,11 @@
     let isScanLocked = false;
 
     // ── نظام التأكيد المزدوج لمنع القراءة الخاطئة ──
+    // على iOS فك التشفير أبطأ بكثير؛ طلب قراءتين خلال 700ms كان يمنع أي قراءة ناجحة
     let pendingCode  = null;    // الكود المنتظر تأكيده
     let pendingCount = 0;       // عدد مرات قراءته متتالياً
     let pendingTimer = null;    // مؤقت إلغاء الكود المعلّق
-    const CONFIRM_HITS   = 2;   // يجب قراءته مرتين متتاليتين
+    const CONFIRM_HITS   = 2;   // يجب قراءته مرتين متتاليتين (أندرويد)
     const CONFIRM_WINDOW = 700; // خلال 700ms
 
     // ── تنظيف وتحقق من صحة الباركود ──
@@ -1745,10 +1726,13 @@
         const code = sanitizeBarcode(rawDecoded);
         if (!code) return;
         if (isScanLocked) return; // لا تقبل مسحات أثناء المعالجة
+        const ios = !!(window.BarcodeScanCore && BarcodeScanCore.IS_IOS);
+        const hitsNeeded = ios ? 1 : CONFIRM_HITS;
+        const windowMs   = ios ? 1600 : CONFIRM_WINDOW;
         if (code === pendingCode) {
             pendingCount++;
-            setScanStatus('confirm', `${t('scanConfirming')}${code} (${pendingCount}/${CONFIRM_HITS})`);
-            if (pendingCount >= CONFIRM_HITS) {
+            setScanStatus('confirm', `${t('scanConfirming')}${code} (${pendingCount}/${hitsNeeded})`);
+            if (pendingCount >= hitsNeeded) {
                 clearTimeout(pendingTimer);
                 const confirmed = pendingCode;
                 pendingCode  = null;
@@ -1760,12 +1744,19 @@
             clearTimeout(pendingTimer);
             pendingCode  = code;
             pendingCount = 1;
+            if (hitsNeeded <= 1) {
+                pendingCode  = null;
+                pendingCount = 0;
+                initAudio();
+                lookupAndAdd(code);
+                return;
+            }
             setScanStatus('confirm', `${t('scanConfirm1')}${code}...`);
             pendingTimer = setTimeout(() => {
                 pendingCode  = null;
                 pendingCount = 0;
                 if (scanningActive) setScanStatus('ready', t('cameraActive'));
-            }, CONFIRM_WINDOW);
+            }, windowMs);
         }
     }
 
@@ -2363,33 +2354,294 @@
         });
     };
 
-    // ── كاميرا محسّنة (BarcodeDetector أولاً، وZXing احتياطي — نفس منطق تبويب الأسعار) ──
-    let _scanStream = null, _scanAnimFrame = null, _scanDetector = null, _scanZxingReader = null;
+    // ── نواة المسح المشتركة (تعمل على iOS Safari وAndroid) ──
+    const BarcodeScanCore = window.BarcodeScanCore = (() => {
+        const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-    // اختيار أفضل كاميرا خلفية للمسح: العدسة الأساسية (wide) وليس Ultra Wide/Telephoto
-    // لأن آيفون (iOS 16.3+) بيرجّع كل عدسة خلفية كـ"كاميرا" منفصلة، والعدسات
-    // الواسعة/التقريب مش بتقدر تركّز على مسافة قريبة زي الباركود.
-    function pickBestBackCamera(cameras) {
-        if (!cameras || !cameras.length) return null;
-        const isFront = d => /front|أمام/i.test(d.label);
-        const isWideExtra = d => /ultra\s*-?\s*wide|telephoto|zoom|tele\b/i.test(d.label);
-        const backCandidates = cameras.filter(d => !isFront(d));
-        return (
-            // 1) تطابق دقيق لاسم العدسة الأساسية "Back Camera" فقط (بدون Ultra Wide/Telephoto)
-            backCandidates.find(d => /^back camera$/i.test(d.label.trim())) ||
-            // 2) أي كاميرا خلفية ما فيهاش كلمة Ultra Wide/Telephoto في الاسم
-            backCandidates.find(d => /back|rear|خلفية|environment/i.test(d.label) && !isWideExtra(d)) ||
-            // 3) أي كاميرا خلفية حتى لو Ultra Wide (أفضل من الأمامية)
-            backCandidates.find(d => /back|rear|خلفية|environment/i.test(d.label)) ||
-            // 4) لو مفيش أسماء واضحة (أجهزة قديمة)، آخر كاميرا في القائمة غالبًا خلفية
-            backCandidates[backCandidates.length - 1] ||
-            cameras[cameras.length - 1]
-        );
-    }
+        function prepareVideo(video) {
+            video.setAttribute('autoplay', '');
+            video.setAttribute('muted', '');
+            video.setAttribute('playsinline', 'true');
+            video.setAttribute('webkit-playsinline', 'true');
+            video.muted = true;
+            video.playsInline = true;
+            video.autoplay = true;
+            try { video.disablePictureInPicture = true; } catch (e) {}
+        }
 
+        async function openStream(deviceId) {
+            const sized = { width: { ideal: 1280 }, height: { ideal: 720 } };
+            const attempts = [];
+            if (deviceId && !IS_IOS) {
+                attempts.push({ audio: false, video: { deviceId: { exact: deviceId }, ...sized } });
+                attempts.push({ audio: false, video: { deviceId: { exact: deviceId } } });
+            }
+            if (deviceId && IS_IOS) {
+                attempts.push({ audio: false, video: { deviceId: { ideal: deviceId }, facingMode: { ideal: 'environment' }, ...sized } });
+            }
+            attempts.push({ audio: false, video: { facingMode: { ideal: 'environment' }, ...sized } });
+            attempts.push({ audio: false, video: { facingMode: 'environment' } });
+            attempts.push({ audio: false, video: true });
+            let lastErr = null;
+            for (const c of attempts) {
+                try { return await navigator.mediaDevices.getUserMedia(c); }
+                catch (e) { lastErr = e; }
+            }
+            throw lastErr || new Error('camera');
+        }
+
+        async function waitForFrames(video) {
+            const ready = () => video.videoWidth > 0 && video.readyState >= 2;
+            if (!ready()) {
+                await new Promise((resolve, reject) => {
+                    const t = setTimeout(() => reject(new Error('video timeout')), 10000);
+                    const done = () => {
+                        if (!ready()) return;
+                        clearTimeout(t);
+                        video.removeEventListener('loadedmetadata', done);
+                        video.removeEventListener('loadeddata', done);
+                        video.removeEventListener('playing', done);
+                        resolve();
+                    };
+                    video.addEventListener('loadedmetadata', done);
+                    video.addEventListener('loadeddata', done);
+                    video.addEventListener('playing', done);
+                    video.play().then(done).catch(() => {});
+                });
+            } else {
+                try { await video.play(); } catch (e) {}
+            }
+            video.width = video.videoWidth;
+            video.height = video.videoHeight;
+            if (IS_IOS) await new Promise(r => setTimeout(r, 400));
+        }
+
+        async function tuneTrack(stream) {
+            const track = stream && stream.getVideoTracks()[0];
+            if (!track) return;
+            const tryApply = async (obj) => { try { await track.applyConstraints(obj); } catch (e) {} };
+            const s = track.getSettings ? track.getSettings() : {};
+            if (s.width && s.height) await tryApply({ width: s.width, height: s.height });
+            const caps = track.getCapabilities ? (track.getCapabilities() || {}) : {};
+            const advanced = {};
+            if (caps.focusMode) {
+                if (caps.focusMode.includes('continuous')) advanced.focusMode = 'continuous';
+                else if (caps.focusMode.includes('single-shot')) advanced.focusMode = 'single-shot';
+            }
+            if (caps.exposureMode && caps.exposureMode.includes('continuous')) advanced.exposureMode = 'continuous';
+            if (caps.whiteBalanceMode && caps.whiteBalanceMode.includes('continuous')) advanced.whiteBalanceMode = 'continuous';
+            if (caps.zoom) {
+                const min = caps.zoom.min || 1;
+                const max = caps.zoom.max || min;
+                advanced.zoom = Math.min(max, Math.max(min, +(min + Math.min(0.5, (max - min) * 0.1)).toFixed(2)));
+            }
+            if (Object.keys(advanced).length) {
+                await tryApply({ advanced: [advanced] });
+                await tryApply(advanced);
+            }
+        }
+
+        async function makeDetector() {
+            if (!('BarcodeDetector' in window)) return null;
+            const wanted = ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','codabar','qr_code'];
+            try {
+                let formats = wanted;
+                if (typeof BarcodeDetector.getSupportedFormats === 'function') {
+                    const supported = await BarcodeDetector.getSupportedFormats();
+                    formats = wanted.filter(f => supported.includes(f));
+                    if (!formats.length) formats = supported.slice();
+                }
+                return new BarcodeDetector({ formats });
+            } catch (e1) {
+                try { return new BarcodeDetector(); } catch (e2) { return null; }
+            }
+        }
+
+        function makeZxing() {
+            if (!window.ZXing) return null;
+            const hints = new Map();
+            const formats = [
+                ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+                ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+                ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+                ZXing.BarcodeFormat.CODABAR, ZXing.BarcodeFormat.ITF
+            ];
+            if (ZXing.BarcodeFormat.CODE_93) formats.push(ZXing.BarcodeFormat.CODE_93);
+            if (ZXing.BarcodeFormat.QR_CODE) formats.push(ZXing.BarcodeFormat.QR_CODE);
+            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+            if (ZXing.DecodeHintType.TRY_HARDER != null) hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+            if (ZXing.DecodeHintType.ALSO_INVERTED != null) hints.set(ZXing.DecodeHintType.ALSO_INVERTED, true);
+            const reader = new ZXing.MultiFormatReader();
+            reader.setHints(hints);
+            return { reader, hints };
+        }
+
+        function isBlackFrame(ctx, w, h) {
+            try {
+                const stepX = Math.max(1, Math.floor(w / 8));
+                const stepY = Math.max(1, Math.floor(h / 8));
+                const img = ctx.getImageData(0, 0, w, h);
+                const d = img.data;
+                let sum = 0, n = 0;
+                for (let y = 0; y < h; y += stepY) {
+                    for (let x = 0; x < w; x += stepX) {
+                        const i = (y * w + x) * 4;
+                        sum += d[i] + d[i + 1] + d[i + 2];
+                        n++;
+                    }
+                }
+                return n > 0 && (sum / n) < 18;
+            } catch (e) { return false; }
+        }
+
+        function zxingDecodeRect(zx, ctx, x, y, w, h, extra) {
+            if (!zx || w < 8 || h < 8) return null;
+            try {
+                const img = ctx.getImageData(x, y, w, h);
+                const src = new ZXing.RGBLuminanceSource(img.data, w, h);
+                const tryOne = (bin) => {
+                    try {
+                        if (zx.reader.reset) zx.reader.reset();
+                        const r = zx.reader.decode(new ZXing.BinaryBitmap(bin));
+                        return r ? r.getText() : null;
+                    } catch (e) { return null; }
+                };
+                let text = tryOne(new ZXing.HybridBinarizer(src));
+                if (!text && extra && ZXing.GlobalHistogramBinarizer) {
+                    text = tryOne(new ZXing.GlobalHistogramBinarizer(src));
+                }
+                if (!text && extra && src.invert) {
+                    text = tryOne(new ZXing.HybridBinarizer(src.invert()));
+                }
+                return text;
+            } catch (e) {
+                try { if (zx.reader.reset) zx.reader.reset(); } catch (e2) {}
+                return null;
+            }
+        }
+
+        function startLoop({ video, isActive, onDecoded, onStats }) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true, alpha: false });
+            let detector = null, zx = null;
+            let nativeN = 0, zxN = 0, pass = 0;
+            let handle = null, usingRvf = false;
+            let nativeFails = 0, nativeDisabled = false, started = false;
+            const MAX_DIM = IS_IOS ? 640 : 800;
+
+            function schedule(fn) {
+                if (!isActive()) return;
+                if (typeof video.requestVideoFrameCallback === 'function') {
+                    usingRvf = true;
+                    handle = video.requestVideoFrameCallback(() => fn());
+                } else {
+                    usingRvf = false;
+                    handle = setTimeout(fn, IS_IOS ? 100 : 60);
+                }
+            }
+            function stopSchedule() {
+                if (handle == null) return;
+                if (usingRvf && video.cancelVideoFrameCallback) {
+                    try { video.cancelVideoFrameCallback(handle); } catch (e) {}
+                } else clearTimeout(handle);
+                handle = null;
+            }
+
+            async function tick() {
+                if (!isActive()) return;
+                const vw = video.videoWidth, vh = video.videoHeight;
+                if (!vw || video.readyState < 2) { schedule(tick); return; }
+                video.width = vw;
+                video.height = vh;
+                const scale = Math.min(1, MAX_DIM / Math.max(vw, vh));
+                const cw = Math.max(1, Math.round(vw * scale));
+                const ch = Math.max(1, Math.round(vh * scale));
+                if (canvas.width !== cw) canvas.width = cw;
+                if (canvas.height !== ch) canvas.height = ch;
+                try {
+                    ctx.imageSmoothingEnabled = true;
+                    if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
+                    if (IS_IOS) ctx.filter = 'contrast(1.28)';
+                    ctx.drawImage(video, 0, 0, cw, ch);
+                    if (IS_IOS) ctx.filter = 'none';
+                }
+                catch (e) { schedule(tick); return; }
+                if (isBlackFrame(ctx, cw, ch)) { schedule(tick); return; }
+
+                let text = null;
+                if (detector && !nativeDisabled) {
+                    try {
+                        nativeN++;
+                        const codes = await Promise.race([
+                            detector.detect(canvas),
+                            new Promise(res => setTimeout(() => res([]), 200))
+                        ]);
+                        if (!isActive()) return;
+                        if (codes && codes.length && codes[0].rawValue) {
+                            text = codes[0].rawValue;
+                            nativeFails = 0;
+                        } else if (IS_IOS && ++nativeFails > 20) {
+                            nativeDisabled = true;
+                        }
+                    } catch (e) {
+                        if (++nativeFails > 6) nativeDisabled = true;
+                    }
+                }
+
+                if (!text && zx) {
+                    zxN++;
+                    pass++;
+                    const extra = (pass % 2) === 0;
+                    const bandH = Math.max(28, Math.round(ch * 0.48));
+                    const bandY = Math.round((ch - bandH) / 2);
+                    text = zxingDecodeRect(zx, ctx, 0, bandY, cw, bandH, extra);
+                    if (!text) text = zxingDecodeRect(zx, ctx, 0, 0, cw, ch, extra);
+                }
+
+                if (onStats) onStats({ native: nativeN, zx: zxN, res: vw + 'x' + vh, ios: IS_IOS });
+                if (text) { try { onDecoded(text); } catch (e) {} }
+                schedule(tick);
+            }
+
+            return {
+                async start() {
+                    if (started) return;
+                    started = true;
+                    detector = await makeDetector();
+                    zx = makeZxing();
+                    schedule(tick);
+                },
+                stop() {
+                    started = false;
+                    stopSchedule();
+                    detector = null;
+                    zx = null;
+                }
+            };
+        }
+
+        function pickBackCamera(cameras) {
+            if (!cameras || !cameras.length) return null;
+            const labeled = (re) => cameras.find(d => re.test(d.label || ''));
+            if (IS_IOS) {
+                return labeled(/back|rear|environment|خلفية/i)
+                    || [...cameras].reverse().find(d => !/front|user|أمامية/i.test(d.label || ''))
+                    || cameras[cameras.length - 1];
+            }
+            return cameras[2]
+                || labeled(/back|rear|خلفية|environment/i)
+                || cameras[cameras.length - 1];
+        }
+
+        return { IS_IOS, prepareVideo, openStream, waitForFrames, tuneTrack, startLoop, pickBackCamera };
+    })();
+
+    // ── كاميرا محسّنة (BarcodeDetector على canvas + ZXing تسلسلياً — إصلاح iOS) ──
+    let _scanStream = null, _scanLoop = null;
     async function listCameras() {
         try {
-            await navigator.mediaDevices.getUserMedia({ video: true })
+            await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
                 .then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
             const devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
             availableCameras = devices.map(d => ({ id: d.deviceId, label: d.label || '' }));
@@ -2402,19 +2654,14 @@
                 select.appendChild(option);
             });
             if (availableCameras.length > 0) {
-                // استعادة الكاميرا المحفوظة أولاً
                 const savedCamId = await loadSetting('invSelectedCamera', '');
                 let selectedCam = savedCamId
                     ? availableCameras.find(d => d.id === savedCamId)
                     : null;
-                // الأولوية: الكاميرا الخلفية الأساسية (وليس Ultra Wide/Telephoto)
-                if (!selectedCam) {
-                    selectedCam = pickBestBackCamera(availableCameras);
-                }
+                if (!selectedCam) selectedCam = BarcodeScanCore.pickBackCamera(availableCameras);
                 currentCameraId = selectedCam.id;
                 select.value = currentCameraId;
             }
-            // تحديث select عند التغيير وحفظه
             select.onchange = () => {
                 currentCameraId = select.value;
                 saveSetting('invSelectedCamera', currentCameraId);
@@ -2426,25 +2673,22 @@
         await stopScanEngine();
         scanningActive = false;
         const cameraDiv = document.getElementById('cameraDiv');
-        const scanLine = document.getElementById('scanLine');
         const video = document.getElementById('reader2');
         cameraDiv.classList.remove('hidden');
         setScanStatus('scanning', t('scanStatusStarting'));
         try {
-            const targetId = cameraId || currentCameraId || (availableCameras[0]?.id);
-            if (!targetId) throw new Error("لا توجد كاميرا متاحة");
-            const constraints = { video: { deviceId: { exact: targetId }, width: { ideal: 1280 }, height: { ideal: 720 } } };
-            _scanStream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (!window.isSecureContext) {
+                throw new Error('الكاميرا تحتاج اتصال آمن (HTTPS). على iOS لا تعمل الكاميرا عبر فتح الملف مباشرة أو رابط http عادي — افتح التطبيق عبر https:// أو من localhost.');
+            }
+            BarcodeScanCore.prepareVideo(video);
+            const targetId = cameraId || currentCameraId || (availableCameras[0]?.id) || null;
+            _scanStream = await BarcodeScanCore.openStream(targetId);
             video.srcObject = _scanStream;
-            await video.play();
-
-            // نفس صيغ الباركود المدعومة سابقاً + أولوية للكاشف الأصلي بالجهاز (أسرع)
-            const supportedFormats = ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','codabar'];
-            _scanDetector = ('BarcodeDetector' in window) ? new BarcodeDetector({ formats: supportedFormats }) : null;
+            await BarcodeScanCore.waitForFrames(video);
+            await BarcodeScanCore.tuneTrack(_scanStream);
 
             scanningActive = true;
-            currentCameraId = targetId;
-            if (scanLine) scanLine.style.display = 'block';
+            if (targetId) currentCameraId = targetId;
             document.getElementById('closeCamBtn').style.display = 'flex';
             setScanStatus('ready', t('cameraActive'));
             initAudio();
@@ -2455,80 +2699,36 @@
                 if (code) document.getElementById('barcodeInput').value = code;
             };
 
-            async function scanLoop() {
-                if (!scanningActive) return;
-                if (_scanDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
-                    try {
-                        const codes = await _scanDetector.detect(video);
-                        if (codes.length > 0) onDecoded(codes[0].rawValue);
-                    } catch (e) {}
-                }
-                _scanAnimFrame = requestAnimationFrame(scanLoop);
+            _scanLoop = BarcodeScanCore.startLoop({
+                video,
+                isActive: () => scanningActive,
+                onDecoded
+            });
+            if (!window.ZXing && !('BarcodeDetector' in window)) {
+                showToast('⚠️ مكتبة قراءة الباركود الاحتياطية (ZXing) لم تُحمَّل — تحقق من مسار الملف libs/zxing.min.js وحالة الأحرف الكبيرة/الصغيرة فيه على GitHub.', true, 8000);
             }
-
-            if (!_scanDetector) {
-                startZxingLoop(video, onDecoded); // fallback لأجهزة ما تدعم BarcodeDetector
-            } else {
-                _scanAnimFrame = requestAnimationFrame(scanLoop);
-            }
+            await _scanLoop.start();
         } catch (err) {
             showToast(t('cameraError') + err.message, true);
             cameraDiv.classList.add('hidden');
-            if (scanLine) scanLine.style.display = 'none';
             document.getElementById('closeCamBtn').style.display = 'none';
             setScanStatus('idle', t('scanStatusFailed'));
             scanningActive = false;
         }
     }
 
-    // ZXing احتياطي — لأجهزة/متصفحات ما تدعم BarcodeDetector الأصلي
-    function startZxingLoop(video, onDecoded) {
-        if (!window.ZXing) return;
-        const hints = new Map();
-        const formats = [
-            ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
-            ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-            ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-            ZXing.BarcodeFormat.CODABAR, ZXing.BarcodeFormat.ITF
-        ];
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-        _scanZxingReader = new ZXing.MultiFormatReader();
-        _scanZxingReader.setHints(hints);
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        function loop() {
-            if (!scanningActive) return;
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0);
-                try {
-                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
-                    const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-                    const result    = _scanZxingReader.decode(bitmap);
-                    if (result) onDecoded(result.getText());
-                } catch (e) {}
-            }
-            _scanAnimFrame = requestAnimationFrame(loop);
-        }
-        _scanAnimFrame = requestAnimationFrame(loop);
-    }
-
     async function stopScanEngine() {
         scanningActive = false;
-        if (_scanAnimFrame) { cancelAnimationFrame(_scanAnimFrame); _scanAnimFrame = null; }
+        if (_scanLoop) { try { _scanLoop.stop(); } catch (e) {} _scanLoop = null; }
         if (_scanStream)    { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
         const video = document.getElementById('reader2');
         if (video) video.srcObject = null;
-        _scanDetector = null; _scanZxingReader = null;
     }
 
     async function closeCamera() {
         await stopScanEngine();
         document.getElementById('cameraDiv').classList.add('hidden');
         document.getElementById('closeCamBtn').style.display = 'none';
-        const scanLine = document.getElementById('scanLine');
-        if (scanLine) scanLine.style.display = 'none';
         setScanStatus('idle', t('scanStatusReady'));
     }
 
@@ -3766,8 +3966,6 @@
                 stopScanEngine();
             }
             scanningActive = false;
-            const scanLine = document.getElementById('scanLine');
-            if (scanLine) scanLine.style.display = 'none';
             const cameraDiv = document.getElementById('cameraDiv');
             if (cameraDiv) cameraDiv.classList.add('hidden');
             const closeCamBtn = document.getElementById('closeCamBtn');
@@ -4744,23 +4942,20 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ══════════════════════════════════════════════
-//  سكانر تبويب الأسعار — BarcodeDetector + ZXing
+//  سكانر تبويب الأسعار — نفس نواة المسح (إصلاح iOS)
 // ══════════════════════════════════════════════
 let _psScanning    = false;
 let _psCameras     = [];
 let _psSelectedCam = null;
 let _psStream      = null;
-let _psAnimFrame   = null;
-let _psDetector    = null;
+let _psLoop        = null;
 let _psCooldown    = false;
-let _psZxingReader = null;
 
-// تحميل قائمة الكاميرات
 async function psLoadCameraList() {
     const sel = document.getElementById('ps-cam-select');
     sel.innerHTML = '<option value="">⏳ جاري التحميل...</option>';
     try {
-        await navigator.mediaDevices.getUserMedia({ video: true })
+        await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
             .then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
         const devices = await navigator.mediaDevices.enumerateDevices();
         _psCameras = devices
@@ -4777,8 +4972,10 @@ async function psLoadCameraList() {
             opt.textContent = cam.label;
             sel.appendChild(opt);
         });
-        // اختيار الكاميرا الخلفية الأساسية تلقائياً (وليس Ultra Wide/Telephoto)
-        const preferred = pickBestBackCamera(_psCameras);
+        const core = window.BarcodeScanCore;
+        const preferred = (core && core.pickBackCamera(_psCameras))
+            || _psCameras.find(c => /back|rear/i.test(c.label))
+            || _psCameras[_psCameras.length - 1];
         sel.value = preferred.id;
         _psSelectedCam = preferred.id;
     } catch (e) {
@@ -4805,32 +5002,33 @@ async function psStartScanner() {
 
     const video = document.getElementById('ps-scanner-video');
     const wrap  = document.getElementById('ps-scanner-wrap');
-    const line  = document.getElementById('ps-scan-line');
     wrap.style.display = 'block';
     video.style.display = 'block';
-    if (line) line.style.display = 'block';
 
-    const camId = _psSelectedCam || (_psCameras.length ? _psCameras[_psCameras.length - 1].id : null);
-    const constraints = camId
-        ? { video: { deviceId: { exact: camId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
-        : { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
-
-    try {
-        _psStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = _psStream;
-        await video.play();
-    } catch (e) {
-        psStopScanner();
+    if (!window.isSecureContext) {
+        showToast('⚠️ الكاميرا تحتاج اتصال آمن (HTTPS). على iOS لا تعمل عبر فتح الملف مباشرة أو رابط http عادي.', true, 6000);
+        wrap.style.display = 'none';
+        video.style.display = 'none';
         return;
     }
 
-    // BarcodeDetector API
-    if ('BarcodeDetector' in window) {
-        _psDetector = new BarcodeDetector({
-            formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code','data_matrix']
-        });
-    } else {
-        _psDetector = null;
+    const core = window.BarcodeScanCore;
+    if (!core) {
+        showToast('⚠️ تعذّر تحميل محرك المسح', true, 4000);
+        return;
+    }
+
+    const camId = _psSelectedCam || (_psCameras.length ? _psCameras[_psCameras.length - 1].id : null);
+    try {
+        core.prepareVideo(video);
+        _psStream = await core.openStream(camId);
+        video.srcObject = _psStream;
+        await core.waitForFrames(video);
+        await core.tuneTrack(_psStream);
+    } catch (e) {
+        psStopScanner();
+        showToast('⚠️ تعذّر تشغيل الكاميرا: ' + (e.name || '') + ' ' + (e.message || ''), true, 6000);
+        return;
     }
 
     _psScanning = true;
@@ -4840,84 +5038,37 @@ async function psStartScanner() {
     btn.style.background = 'linear-gradient(135deg,#991b1b,#ef4444)';
     btn.disabled = false;
 
-    // حلقة المسح بـ BarcodeDetector
-    async function psScanLoop() {
-        if (!_psScanning) return;
-        if (_psDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
-            try {
-                const barcodes = await _psDetector.detect(video);
-                if (barcodes.length > 0 && !_psCooldown) {
-                    _psCooldown = true;
-                    psOnBarcodeFound(barcodes[0].rawValue);
-                    setTimeout(() => { _psCooldown = false; }, 1500);
-                }
-            } catch (e) {}
+    _psLoop = core.startLoop({
+        video,
+        isActive: () => _psScanning,
+        onDecoded: (text) => {
+            if (_psCooldown) return;
+            _psCooldown = true;
+            psOnBarcodeFound(text);
+            setTimeout(() => { _psCooldown = false; }, 1500);
         }
-        _psAnimFrame = requestAnimationFrame(psScanLoop);
+    });
+    if (!window.ZXing && !('BarcodeDetector' in window)) {
+        showToast('⚠️ مكتبة قراءة الباركود الاحتياطية (ZXing) لم تُحمَّل — تحقق من مسار الملف libs/zxing.min.js وحالة الأحرف الكبيرة/الصغيرة فيه على GitHub.', true, 8000);
     }
-
-    if (!_psDetector) {
-        psStartZxingLoop(video); // fallback
-    } else {
-        _psAnimFrame = requestAnimationFrame(psScanLoop);
-    }
+    await _psLoop.start();
 }
 
 async function psStopScanner() {
     _psScanning = false;
     _psCooldown = false;
-    if (_psAnimFrame) { cancelAnimationFrame(_psAnimFrame); _psAnimFrame = null; }
+    if (_psLoop) { try { _psLoop.stop(); } catch (e) {} _psLoop = null; }
     if (_psStream)    { _psStream.getTracks().forEach(t => t.stop()); _psStream = null; }
     const video = document.getElementById('ps-scanner-video');
     const wrap  = document.getElementById('ps-scanner-wrap');
-    const line  = document.getElementById('ps-scan-line');
     if (video) { video.srcObject = null; }
     if (wrap)  { wrap.style.display = 'none'; }
-    if (line)  { line.style.display = 'none'; }
     const btn = document.getElementById('ps-toggle-btn');
     if (btn) {
         btn.innerHTML = '<i class="fas fa-camera"></i> ' + (i18n[currentLang]?.pricesStartScanner || 'تشغيل السكانر');
         btn.style.background = 'linear-gradient(135deg,#b45309,#f59e0b)';
         btn.disabled = false;
     }
-}
-
-// ZXing fallback
-function psStartZxingLoop(video) {
-    if (!window.ZXing) return;
-    const hints = new Map();
-    const formats = [
-        ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
-        ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-        ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-        ZXing.BarcodeFormat.QR_CODE
-    ];
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-    _psZxingReader = new ZXing.MultiFormatReader();
-    _psZxingReader.setHints(hints);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    function zLoop() {
-        if (!_psScanning) return;
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.width  = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            try {
-                const imgData  = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
-                const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-                const result    = _psZxingReader.decode(bitmap);
-                if (result && !_psCooldown) {
-                    _psCooldown = true;
-                    psOnBarcodeFound(result.getText());
-                    setTimeout(() => { _psCooldown = false; }, 1500);
-                }
-            } catch (e) {}
-        }
-        _psAnimFrame = requestAnimationFrame(zLoop);
-    }
-    _psAnimFrame = requestAnimationFrame(zLoop);
 }
 
 // عند قراءة الباركود
